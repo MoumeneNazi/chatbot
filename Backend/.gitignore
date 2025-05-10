@@ -1,0 +1,6 @@
+__pycache__/
+.env
+node_modules/
+session_memory.json
+*.pyc
+.vscode/
