@@ -4,9 +4,22 @@ from chatbot import MentalHealthChatbot
 from fastapi.middleware.cors import CORSMiddleware
 from journal import save_entry, get_entries
 from journal import get_sentiment_summary
+from auth import router as auth_router
+from database import Base, engine
+from auth import get_current_user
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from models import ChatMessage
+from database import SessionLocal
+import models
+from database import Base, engine
 
 
 app = FastAPI()
+
+
+Base.metadata.create_all(bind=engine)
+app.include_router(auth_router)
 
 # Neo4j connection details
 URI = "bolt://localhost:7687"
@@ -54,6 +67,39 @@ def mood_summary():
 
 
 @app.post("/chat")
-def get_chat_response(message: Message):
+def get_chat_response(message: Message, current_user=Depends(get_current_user)):
+    db = SessionLocal()
+
+    # Store user message
+    user_msg = ChatMessage(user_id=current_user.id, role="user", message=message.message)
+    db.add(user_msg)
+
+    # Generate bot reply
     response = chatbot.chat(message.message)
+
+    # Store bot reply
+    bot_msg = ChatMessage(user_id=current_user.id, role="bot", message=response)
+    db.add(bot_msg)
+
+    db.commit()
     return {"response": response}
+
+
+
+
+
+@app.get("/chat/history")
+def get_chat_history(current_user=Depends(get_current_user)):
+    db = SessionLocal()
+    messages = db.query(ChatMessage).filter(ChatMessage.user_id == current_user.id).order_by(ChatMessage.timestamp).all()
+    return [
+        {
+            "role": msg.role,
+            "message": msg.message,
+            "timestamp": msg.timestamp.isoformat()
+        }
+        for msg in messages
+    ]
+
+
+

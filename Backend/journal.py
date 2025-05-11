@@ -26,7 +26,7 @@ def analyze_sentiment(text):
 def get_sentiment_summary():
     entries = load_journal()
     today = date.today()
-    sentiments = [e["sentiment"] for e in entries if e["timestamp"].startswith(str(today))]
+    sentiments = [e.get("sentiment", "unknown") for e in entries if e["timestamp"].startswith(str(today))]
     count = Counter(sentiments)
     return {
         "date": str(today),
