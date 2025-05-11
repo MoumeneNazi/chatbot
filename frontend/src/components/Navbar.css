@@ -1,0 +1,63 @@
+/* General Navbar Styles */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background-color: #f0f0f0;
+    border-bottom: 2px solid #ddd;
+  }
+  
+  .navbar-logo h1 {
+    font-size: 1.5rem;
+    color: #333;
+  }
+  
+  .navbar-links {
+    display: flex;
+    gap: 1.5rem;
+  }
+  
+  .navbar-links a {
+    text-decoration: none;
+    color: #333;
+    font-weight: bold;
+  }
+  
+  .navbar-links a:hover {
+    color: #007bff;
+  }
+  
+  /* Buttons Section */
+  .navbar-buttons {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1rem;
+    gap: 1rem;
+  }
+  
+  .btn-login,
+  .btn-register {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .btn-login {
+    background-color: #007bff;
+    color: #fff;
+  }
+  
+  .btn-register {
+    background-color: #28a745;
+    color: #fff;
+  }
+  
+  .btn-login:hover {
+    background-color: #0056b3;
+  }
+  
+  .btn-register:hover {
+    background-color: #218838;
+  }

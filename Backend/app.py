@@ -12,7 +12,8 @@ from fastapi import Depends
 from models import ChatMessage
 from database import SessionLocal
 import models
-from database import Base, engine
+from database import Base
+from therapist import router as therapist_router
 
 
 app = FastAPI()
@@ -20,6 +21,7 @@ app = FastAPI()
 
 Base.metadata.create_all(bind=engine)
 app.include_router(auth_router)
+app.include_router(therapist_router)
 
 # Neo4j connection details
 URI = "bolt://localhost:7687"
