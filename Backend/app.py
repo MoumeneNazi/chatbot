@@ -6,6 +6,12 @@ from journal import save_entry, get_entries
 from journal import get_sentiment_summary
 from auth import router as auth_router
 from database import Base, engine
+
+
+from auth import get_current_user  # Assuming this imports the current user function
+from security import verify_password  # Assuming this function is implemented in 'security.py'
+from auth import create_access_token  # Assuming you already have a function to create JWT tokens
+
 from auth import get_current_user
 from sqlalchemy.orm import Session
 from schemas import UserCreate
@@ -30,6 +36,16 @@ URI = "bolt://localhost:7687"
 USERNAME = "neo4j"
 PASSWORD = "mimo2021"
 
+
+#dependency to get access to database 
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 # Instantiate chatbot with required credentials
 chatbot = MentalHealthChatbot(uri=URI, user=USERNAME, password=PASSWORD)
 
@@ -40,6 +56,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
 
 class Message(BaseModel):
     message: str
@@ -89,7 +111,7 @@ def get_chat_response(message: Message, current_user=Depends(get_current_user)):
     return {"response": response}
 
 
-@router.post("/register")
+@app.post("/register")
 def register(user: UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.username == user.username).first()
     if existing_user:
@@ -104,6 +126,22 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     return {"msg": "User created successfully"}
+
+
+
+@app.post("/login")
+def login(request : LoginRequest , db : Session = Depends(get_db)):
+    user_db = db.query(User).filter(User.username == request.username).first()
+
+    if not user_db or not verify_password(request.password, user_db.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    # Create JWT token
+    access_token = create_access_token(data={"sub": request.username})
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
 
 
 @app.get("/chat/history")

@@ -3,7 +3,7 @@ import json
 import os
 import random
 from datetime import datetime
-from textblob import TextBlob  # pip install textblob
+from textblob import TextBlob         # pip install textblob
 
 # Neo4j connection details
 URI      = "bolt://localhost:7687"
