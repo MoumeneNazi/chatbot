@@ -1,0 +1,6 @@
+@media(max-width:600px) {
+    main { padding-top:100px; }
+    .hero h1 { font-size:2rem; }
+    .cards { flex-direction:column; }
+  }
+  

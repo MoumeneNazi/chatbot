@@ -1,0 +1,182 @@
+.home-detailed {
+    font-family: 'Segoe UI', sans-serif;
+    color: #333;
+    line-height: 1.5;
+  }
+  
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    text-align: center;
+    padding: 4rem 1rem;
+  }
+  .hero h1 {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+  }
+  .hero p {
+    font-size: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+  .cta {
+    background: white;
+    color: #333;
+    padding: 0.8rem 2rem;
+    border-radius: 4px;
+    font-weight: bold;
+    text-decoration: none;
+    transition: background 0.3s;
+  }
+  .cta:hover {
+    background: #f0f0f0;
+  }
+  
+  /* Features */
+  .features {
+    padding: 3rem 1rem;
+    text-align: center;
+  }
+  .cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    justify-content: center;
+    margin-top: 2rem;
+  }
+  .card {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    width: 200px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    transition: transform 0.3s;
+  }
+  .card:hover {
+    transform: translateY(-5px);
+  }
+  .icon {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    display: block;
+  }
+  .chat-icon::before { content: "💬"; }
+  .journal-icon::before { content: "📔"; }
+  .graph-icon::before { content: "📈"; }
+  .therapist-icon::before { content: "👩‍⚕️"; }
+  
+  /* How It Works */
+  .how-it-works {
+    background: #f9fafb;
+    padding: 3rem 1rem;
+  }
+  .how-it-works ol {
+    max-width: 600px;
+    margin: auto;
+    text-align: left;
+    list-style: decimal inside;
+  }
+  .how-it-works li {
+    margin: 1rem 0;
+    font-size: 1.1rem;
+  }
+  
+  /* Team */
+  .team {
+    padding: 3rem 1rem;
+    text-align: center;
+  }
+  .profiles {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 2rem;
+  }
+  .profile {
+    width: 150px;
+  }
+  .profile img {
+    width: 100%;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  .profile h4 {
+    margin: 0.5rem 0 0.25rem;
+  }
+  .profile p {
+    margin: 0;
+    color: #666;
+  }
+  
+  /* FAQ */
+  .faq {
+    padding: 3rem 1rem;
+    max-width: 700px;
+    margin: auto;
+  }
+  .faq-item {
+    margin-bottom: 1rem;
+  }
+  .faq-item button {
+    width: 100%;
+    text-align: left;
+    background: #e5e7eb;
+    padding: 1rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    display: flex;
+    justify-content: space-between;
+    cursor: pointer;
+  }
+  .answer {
+    padding: 1rem;
+    background: white;
+    border-left: 4px solid #667eea;
+    border-radius: 0 4px 4px 0;
+  }
+  
+  /* Newsletter */
+  .newsletter {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    text-align: center;
+    padding: 3rem 1rem;
+  }
+  .newsletter form {
+    margin-top: 1rem;
+  }
+  .newsletter input {
+    padding: 0.75rem;
+    width: 250px;
+    border: none;
+    border-radius: 4px;
+    margin-right: 0.5rem;
+  }
+  .newsletter button {
+    padding: 0.75rem 1.5rem;
+    background: white;
+    color: #333;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 2rem 1rem;
+    background: #f4f6f9;
+    color: #666;
+    font-size: 0.9rem;
+  }
+  footer a {
+    color: #667eea;
+    text-decoration: none;
+  }
+  footer a:hover {
+    text-decoration: underline;
+  }
+  

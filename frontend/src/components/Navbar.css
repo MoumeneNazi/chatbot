@@ -1,0 +1,30 @@
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    padding: 1rem 2rem;
+    align-items: center;
+    background: #1f2937;
+    color: white;
+    flex-wrap: wrap;
+  }
+  
+  .nav-left, .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+  
+  .navbar a, .navbar button {
+    color: white;
+    text-decoration: none;
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  
+  .logo {
+    height: 32px;
+    margin-right: 0.75rem;
+  }
+  
