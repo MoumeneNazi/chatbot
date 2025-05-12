@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI , Depends , HTTPException
 from pydantic import BaseModel
 from chatbot import MentalHealthChatbot
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,12 +8,14 @@ from auth import router as auth_router
 from database import Base, engine
 from auth import get_current_user
 from sqlalchemy.orm import Session
+from schemas import UserCreate
 from fastapi import Depends
 from models import ChatMessage
 from database import SessionLocal
-import models
+from models import User
 from database import Base
 from therapist import router as therapist_router
+from security import hash_password
 
 
 app = FastAPI()
@@ -87,7 +89,21 @@ def get_chat_response(message: Message, current_user=Depends(get_current_user)):
     return {"response": response}
 
 
-
+@router.post("/register")
+def register(user: UserCreate, db: Session = Depends(get_db)):
+    existing_user = db.query(User).filter(User.username == user.username).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    new_user = User(
+        username=user.username,
+        hashed_password=hash_password(user.password),
+        role="user"  # default role
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {"msg": "User created successfully"}
 
 
 @app.get("/chat/history")

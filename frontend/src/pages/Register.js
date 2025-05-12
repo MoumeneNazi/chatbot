@@ -1,36 +1,45 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { saveToken } from '../auth';
+import '../styles/auth.css';
 
 function Register() {
   const [form, setForm] = useState({ username: '', password: '' });
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const res = await fetch('http://localhost:8000/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
-    });
+  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 
-    const data = await res.json();
-    if (res.ok) {
-      saveToken(data.access_token);
-      navigate('/chat');
-    } else {
-      alert(data.detail || 'Registration failed');
+  const handleSubmit = async e => {
+    e.preventDefault();
+    setError('');
+    try {
+      const res = await fetch('http://localhost:8000/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+
+      if (res.ok) {
+        navigate('/login');
+      } else {
+        const data = await res.json();
+        setError(data.detail || 'Registration failed');
+      }
+    } catch {
+      setError('Server error');
     }
   };
 
   return (
-    <div className="form-box">
+    <div className="auth-page">
       <h2>Register</h2>
       <form onSubmit={handleSubmit}>
-        <input placeholder="Username" onChange={e => setForm({ ...form, username: e.target.value })} required />
-        <input type="password" placeholder="Password" onChange={e => setForm({ ...form, password: e.target.value })} required />
+        <input name="username" placeholder="Username" onChange={handleChange} required />
+        <input name="password" type="password" placeholder="Password" onChange={handleChange} required />
         <button type="submit">Register</button>
+        {error && <p className="error">{error}</p>}
       </form>
+      <p>Already have an account? <a href="/login">Login</a></p>
     </div>
   );
 }
