@@ -4,3 +4,4 @@ neo4j
 textblob
 pydantic
 python-multipart
+axios

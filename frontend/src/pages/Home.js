@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import '../styles/pages.css';
-import './Home.css';
+import '../styles/HomeUnified.css';  // NEW unified CSS file
 import { Link } from 'react-router-dom';
 
 export default function Home() {
@@ -78,23 +77,56 @@ export default function Home() {
         </div>
       </section>
 
-      {/* TESTIMONIALS */}
-      <section className="testimonials reveal">
-        <h2>What Our Users Say</h2>
-        <div className="testimonial-boxes">
-          <div className="testimonial">
-            <p>“I used to keep my feelings bottled up. Now I reflect daily, and it’s changed my life.”</p>
-            <small>— Lina, 22</small>
-          </div>
-          <div className="testimonial">
-            <p>“MindCompanion gives me the support I need between therapy sessions.”</p>
-            <small>— Omar, 29</small>
-          </div>
-          <div className="testimonial">
-            <p>“I can finally see patterns in my emotions. It’s helped me understand myself better.”</p>
-            <small>— Amina, 35</small>
-          </div>
-        </div>
+      {/* ADDITIONAL CONTENT */}
+
+      {/* USER STORIES */}
+      <section className="user-stories reveal">
+        <h2>User Stories</h2>
+        <p>Thousands of users have transformed their lives through mindful self-reflection and AI guidance.</p>
+        <blockquote>
+          “Before MindCompanion, I struggled to express my feelings. Now I have a trusted companion that understands me.” – Sarah, 28
+        </blockquote>
+        <blockquote>
+          “The AI helps me see patterns I never noticed. It’s like having a therapist in my pocket.” – James, 34
+        </blockquote>
+      </section>
+
+      {/* DAILY TOOLS */}
+      <section className="daily-tools reveal">
+        <h2>Daily Wellness Tools</h2>
+        <ul>
+          <li>Mindfulness prompts to keep you centered.</li>
+          <li>Emotion tracking for deeper self-awareness.</li>
+          <li>Personalized coping strategies based on your mood.</li>
+          <li>Journaling made easy with sentiment analysis.</li>
+        </ul>
+      </section>
+
+      {/* BACKED BY SCIENCE */}
+      <section className="backed-by-science reveal">
+        <h2>Backed by Science</h2>
+        <p>Our system uses the latest in natural language processing and psychological research to deliver empathetic, accurate support.</p>
+        <p>Developed in collaboration with mental health professionals and AI experts.</p>
+      </section>
+
+      {/* DAILY CHECKLIST */}
+      <section className="daily-checklist reveal">
+        <h2>Daily Self-Care Checklist</h2>
+        <ol>
+          <li>Take deep breaths for 5 minutes.</li>
+          <li>Write down 3 things you’re grateful for.</li>
+          <li>Check in with your mood using our AI chat.</li>
+          <li>Reach out to a friend or therapist if needed.</li>
+          <li>Practice mindful meditation or stretching.</li>
+        </ol>
+      </section>
+
+      {/* QUOTES */}
+      <section className="quotes reveal">
+        <h2>Inspirational Quotes</h2>
+        <p>“The greatest wealth is health.” — Virgil</p>
+        <p>“Self-care is not selfish.” — Audrey Lorde</p>
+        <p>“Healing takes time, and asking for help is a courageous step.” — Mariska Hargitay</p>
       </section>
 
       {/* FAQ */}

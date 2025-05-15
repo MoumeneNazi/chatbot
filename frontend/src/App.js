@@ -1,59 +1,57 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Home from "./pages/Home";
-import Chat from "./pages/Chat";
-import Journal from "./pages/Journal";
-import Progress from "./pages/Progress";
+import UserDashboard from "./pages/UserDashboard";
 import TherapistDashboard from "./pages/TherapistDashboard";
-import AdminDashboard from "./pages/AdminDashboard";
-import About from "./pages/About";
-import Contact from "./pages/Contact"; // previously 'Conatct'
-import UserDashboard from "./pages/UserDashboard";     
-import ProgressPage from "./pages/Progress";           
-import JournalPage from "./pages/Journal";             
-
-
+import Progress from "./pages/Progress";
+import Journal from "./pages/Journal";
+import Home from "./pages/Home";
+import Navbar from "./components/Navbar";
+import Chat from "./pages/Chat";
 
 const App = () => {
-  const userRole = localStorage.getItem("role");
+  const [role, setRole] = useState(localStorage.getItem("role"));
+
+  useEffect(() => {
+    const storedRole = localStorage.getItem("role");
+    setRole(storedRole);
+  }, [localStorage.getItem("role")]);
 
   return (
     <Router>
+      <Navbar />
       <Routes>
+        <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-        {/* User Dashboard */}
+        {/* User Routes */}
         <Route
           path="/user/dashboard"
-          element={
-            userRole === "user" ? <UserDashboard /> : <Navigate to="/login" />
-          }
+          element={role === "user" ? <UserDashboard /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/chat"
+          element={role === "user" ? <Chat /> : <Navigate to="/login" />}
         />
 
-        {/* Therapist Dashboard */}
+        {/* Therapist Routes */}
         <Route
           path="/therapist/dashboard"
-          element={
-            userRole === "therapist" ? <TherapistDashboard /> : <Navigate to="/login" />
-          }
+          element={role === "therapist" ? <TherapistDashboard /> : <Navigate to="/login" />}
         />
         <Route
           path="/therapist/progress"
-          element={
-            userRole === "therapist" ? <ProgressPage /> : <Navigate to="/login" />
-          }
+          element={role === "therapist" ? <Progress /> : <Navigate to="/login" />}
         />
         <Route
           path="/therapist/journal"
-          element={
-            userRole === "therapist" ? <JournalPage /> : <Navigate to="/login" />
-          }
+          element={role === "therapist" ? <Journal /> : <Navigate to="/login" />}
         />
 
-        {/* Redirect unknown paths to login */}
-        <Route path="*" element={<Navigate to="/login" />} />
+        {/* Catch all unknown paths */}
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
   );

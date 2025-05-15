@@ -67,6 +67,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 def login(user: UserLogin, db: Session = Depends(get_db)):
     logging.debug(f"Attempting login for user: {user.username}")
     db_user = db.query(User).filter(User.username == user.username).first()
+    print(db_user)
     if not db_user:
         logging.debug(f"User {user.username} not found in database.")
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -75,7 +76,7 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     logging.debug(f"User {user.username} authenticated successfully.")
     token = create_access_token({"sub": db_user.username}, db_user.role)
-    return {"access_token": token, "token_type": "bearer"}
+    return {"access_token": token, "token_type": "bearer","role": db_user.role}
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     logging.debug(f"Authenticating token: {token}")

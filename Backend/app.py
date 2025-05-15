@@ -91,27 +91,48 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == request.username).first()
     if not user or not verify_password(request.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = create_access_token(data={"sub": user.username}, role=user.role)
-    return {"access_token": token, "token_type": "bearer"}
+
+    # Pass role as second argument
+    access_token = create_access_token(data={"sub": user.username}, role=user.role)
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "role": user.role
+    }
 
 @app.post("/token")
-async def token(
-    request: Request,
-    username: str = Form(None),
-    password: str = Form(None),
-    db: Session = Depends(get_db)
-):
-    if request.headers.get("content-type") == "application/json":
+async def token(request: Request, db: Session = Depends(get_db)):
+    try:
         body = await request.json()
         username = body.get("username")
         password = body.get("password")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid or missing JSON payload")
+
     if not username or not password:
         raise HTTPException(status_code=400, detail="Missing credentials")
-    login_request = LoginRequest(username=username, password=password)
-    return login(login_request, db)
+
+    user = db.query(User).filter(User.username == username).first()
+    if not user or not verify_password(password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    access_token = create_access_token(data={"sub": user.username}, role=user.role)
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "role": user.role  # ✅ This is required by frontend
+    }
+
+
 
 @app.post("/chat")
-def get_chat_response(message: Message, db: Session = Depends(get_db), current_user=Depends(require_user)):
+def get_chat_response(
+    message: Message,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_user)
+):
     db.add(ChatMessage(user_id=current_user.id, role="user", message=message.message))
     reply = chatbot.chat(message.message)
     if isinstance(reply, dict):
@@ -121,19 +142,26 @@ def get_chat_response(message: Message, db: Session = Depends(get_db), current_u
     return {"response": reply}
 
 @app.get("/chat/history")
-def get_chat_history(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    messages = db.query(ChatMessage).filter(ChatMessage.user_id == current_user.id).order_by(ChatMessage.timestamp).all()
+def get_chat_history(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    messages = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.user_id == current_user.id)
+        .order_by(ChatMessage.timestamp)
+        .all()
+    )
     return [
-        {
-            "role": msg.role,
-            "message": msg.message,
-            "timestamp": msg.timestamp.isoformat()
-        }
+        {"role": msg.role, "message": msg.message, "timestamp": msg.timestamp.isoformat()}
         for msg in messages
     ]
 
 @app.post("/journal")
-def submit_journal(message: Message, current_user=Depends(require_user)):
+def submit_journal(
+    message: Message,
+    current_user=Depends(require_user)
+):
     entry = save_entry(message.message, current_user.username)
     return {"status": "saved", "entry": entry}
 
@@ -146,14 +174,20 @@ def session_history():
     return chatbot.session_context.get("session_history", [])
 
 @app.get("/progress")
-def mood_summary(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def mood_summary(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
     if current_user.role == "therapist":
         return get_sentiment_summary(db)
-    else:
-        return get_sentiment_summary(db, user_id=current_user.id)
+    return get_sentiment_summary(db, user_id=current_user.id)
 
 @app.post("/therapist/add")
-def add_therapist(user: UserCreate, db: Session = Depends(get_db), current_user=Depends(require_therapist)):
+def add_therapist(
+    user: UserCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_therapist)
+):
     if db.query(User).filter(User.username == user.username).first():
         raise HTTPException(status_code=400, detail="Username already exists")
     new_user = User(
@@ -167,7 +201,10 @@ def add_therapist(user: UserCreate, db: Session = Depends(get_db), current_user=
     return {"msg": "Therapist account created successfully."}
 
 @app.get("/therapist/chat/history")
-def get_all_chat_history(db: Session = Depends(get_db), current_user=Depends(require_therapist)):
+def get_all_chat_history(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_therapist)
+):
     messages = db.query(ChatMessage).order_by(ChatMessage.timestamp).all()
     return [
         {
@@ -180,7 +217,10 @@ def get_all_chat_history(db: Session = Depends(get_db), current_user=Depends(req
     ]
 
 @app.get("/therapist/dashboard")
-def get_therapist_dashboard(db: Session = Depends(get_db), current_user=Depends(require_therapist)):
+def get_therapist_dashboard(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_therapist)
+):
     one_day_ago = datetime.utcnow() - timedelta(days=1)
     patients = (
         db.query(User)

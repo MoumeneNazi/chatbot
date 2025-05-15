@@ -1,35 +1,58 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getToken, logout } from '../auth';
+import logo from '../assets/logo.png';
 import '../styles/navbar.css';
 
 function Navbar() {
-  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [role, setRole] = useState(localStorage.getItem('role'));
+  const [isAuthenticated, setIsAuthenticated] = useState(!!getToken());
+
+  useEffect(() => {
+    const token = getToken();
+    const currentRole = localStorage.getItem('role');
+    setIsAuthenticated(!!token);
+    setRole(currentRole);
+  }, [location]); // re-run on every route change
+
+  const handleLogout = () => {
+    logout();
+    setIsAuthenticated(false);
+    setRole(null);
+    navigate('/login');
+  };
 
   return (
-    <nav className={`navbar ${open ? 'expanded' : ''}`}>
+    <nav className="navbar">
       <div className="nav-left">
-        <Link to="/"><img src="/logo192.png" alt="MindCompanion" className="logo" /></Link>
+        <Link to="/">
+          <img src={logo} alt="MindCompanion" className="logo" />
+        </Link>
         <Link to="/">Home</Link>
         <Link to="/about">About</Link>
         <Link to="/testimonials">Testimonials</Link>
         <Link to="/contact">Contact</Link>
       </div>
 
-      <div className="hamburger" onClick={() => setOpen(!open)}>
-        <div style={{ transform: open ? 'rotate(45deg) translate(5px,5px)' : '' }} />
-        <div style={{ opacity: open ? 0 : 1 }} />
-        <div style={{ transform: open ? 'rotate(-45deg) translate(6px,-6px)' : '' }} />
-      </div>
-
       <div className="nav-right">
-        {getToken() ? (
+        {isAuthenticated ? (
           <>
-            <Link to="/chat">Chat</Link>
-            <Link to="/journal">Journal</Link>
-            <Link to="/progress">Progress</Link>
-            <Link to="/therapist">Therapist</Link>
-            <button className="glow" onClick={logout}>Logout</button>
+            {role === 'user' && (
+              <>
+                <Link to="/chat">Chat</Link>
+                <Link to="/user/dashboard">Dashboard</Link>
+              </>
+            )}
+            {role === 'therapist' && (
+              <>
+                <Link to="/therapist/dashboard">Dashboard</Link>
+                <Link to="/therapist/progress">Progress</Link>
+                <Link to="/therapist/journal">Journal</Link>
+              </>
+            )}
+            <button className="glow" onClick={handleLogout}>Logout</button>
           </>
         ) : (
           <>

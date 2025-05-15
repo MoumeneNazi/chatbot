@@ -1,24 +1,21 @@
-import { getToken } from './auth';
+// src/api.js
+import axios from "axios";
 
-const API = "http://localhost:8000";
+const instance = axios.create({
+  baseURL: "http://localhost:8000",
+  headers: {
+    "Content-Type": "application/json",
+    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+  },
+});
 
-export async function post(endpoint, data) {
-  const res = await fetch(`${API}${endpoint}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getToken()}`
-    },
-    body: JSON.stringify(data)
-  });
-  return res.json();
-}
+// Automatically attach JWT token
+instance.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
-export async function get(endpoint) {
-  const res = await fetch(`${API}${endpoint}`, {
-    headers: {
-      Authorization: `Bearer ${getToken()}`
-    }
-  });
-  return res.json();
-}
+export default instance;
