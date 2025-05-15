@@ -1,37 +1,48 @@
 import React, { useState } from 'react';
-import { get } from '../api';
+import '../styles/therapist.css';
 
 function Therapist() {
   const [username, setUsername] = useState('');
-  const [chat, setChat] = useState([]);
-  const [journal, setJournal] = useState([]);
+  const [entries, setEntries] = useState([]);
+  const [error, setError] = useState('');
 
-  const fetchData = async () => {
-    const chatData = await get(`/admin/chat/${username}`);
-    const journalData = await get(`/admin/journal/${username}`);
-    setChat(chatData);
-    setJournal(journalData);
+  const token = localStorage.getItem('token');
+
+  const fetchUserJournal = async () => {
+    setError('');
+    try {
+      const res = await fetch(`http://localhost:8000/admin/journal/${username}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEntries(data);
+      } else {
+        setError(data.detail || 'Access denied');
+      }
+    } catch {
+      setError('Server error');
+    }
   };
 
   return (
-    <div className="form-box">
-      <h2>Therapist Review</h2>
-      <input placeholder="Username" onChange={e => setUsername(e.target.value)} />
-      <button onClick={fetchData}>Fetch User Data</button>
-
-      <h3>Chat History</h3>
-      {chat.map((c, i) => (
-        <div key={i}><strong>{c.role}:</strong> {c.message}</div>
-      ))}
-
-      <h3>Journal Entries</h3>
-      {journal.map((j, i) => (
-        <div key={i}>
-          <strong>{new Date(j.timestamp).toLocaleString()}</strong><br />
-          {j.entry}<br />
-          {j.sentiment && <em>Sentiment: {j.sentiment}</em>}
-        </div>
-      ))}
+    <div className="therapist-page">
+      <h2>Review User Journal</h2>
+      <input
+        placeholder="Enter username"
+        value={username}
+        onChange={e => setUsername(e.target.value)}
+      />
+      <button onClick={fetchUserJournal}>Fetch</button>
+      {error && <p className="error">{error}</p>}
+      <div className="journal-entries">
+        {entries.map((e, i) => (
+          <div key={i} className="entry-box">
+            <p>{e.entry}</p>
+            <span>{e.sentiment} — {new Date(e.timestamp).toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

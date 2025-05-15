@@ -1,48 +1,57 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import '../styles/auth.css';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-function Login() {
-  const [form, setForm] = useState({ username: '', password: '' });
-  const [error, setError] = useState('');
+const Login = () => {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const handleSubmit = async e => {
-    e.preventDefault();
-    setError('');
+  const handleLogin = async () => {
     try {
-      const res = await fetch('http://localhost:8000/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(form),
+      const response = await fetch("/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
       });
 
-      const data = await res.json();
-      if (data.access_token) {
-        localStorage.setItem('token', data.access_token);
-        navigate('/chat');
+      const data = await response.json();
+      if (response.ok) {
+        // Store token and role in localStorage
+        localStorage.setItem("token", data.access_token);
+        localStorage.setItem("role", data.role);  // Assuming the role is part of the response
+
+        // Redirect based on role
+        if (data.role === "therapist") {
+          navigate.push("/therapist/dashboard");
+        } else {
+          navigate.push("/user/dashboard");
+        }
       } else {
-        setError('Invalid credentials');
+        console.error("Login failed");
       }
-    } catch {
-      setError('Server error');
+    } catch (error) {
+      console.error("Error during login:", error);
     }
   };
 
   return (
-    <div className="auth-page">
+    <div>
       <h2>Login</h2>
-      <form onSubmit={handleSubmit}>
-        <input name="username" placeholder="Username" onChange={handleChange} required />
-        <input name="password" type="password" placeholder="Password" onChange={handleChange} required />
-        <button type="submit">Login</button>
-        {error && <p className="error">{error}</p>}
-      </form>
-      <p>Don't have an account? <a href="/register">Register</a></p>
+      <input
+        type="text"
+        placeholder="Username"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+      />
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <button onClick={handleLogin}>Login</button>
     </div>
   );
-}
+};
 
 export default Login;

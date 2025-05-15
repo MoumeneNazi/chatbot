@@ -1,37 +1,73 @@
 import React, { useState, useEffect } from 'react';
-import { get, post } from '../api';
+import '../styles/journal.css';
 
 function Journal() {
-  const [entry, setEntry] = useState('');
-  const [logs, setLogs] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [journalEntries, setJournalEntries] = useState([]);
+  const token = localStorage.getItem('token');
 
-  const loadLogs = async () => {
-    const data = await get('/journal');
-    setLogs(data.entries || []);
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/admin/users', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data);
+      } else {
+        console.error('Failed to fetch users');
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
   };
 
-  const saveEntry = async () => {
-    if (!entry) return;
-    await post('/journal', { entry });
-    setEntry('');
-    loadLogs();
+  const fetchJournalEntries = async (username) => {
+    try {
+      const res = await fetch(`http://localhost:8000/admin/journal/${username}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setJournalEntries(data);
+        setSelectedUser(username);
+      } else {
+        console.error('Failed to fetch journal entries');
+      }
+    } catch (error) {
+      console.error('Error fetching journal entries:', error);
+    }
   };
 
-  useEffect(() => { loadLogs(); }, []);
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   return (
-    <div className="form-box">
-      <h2>Daily Journal</h2>
-      <textarea rows={4} value={entry} onChange={e => setEntry(e.target.value)} />
-      <button onClick={saveEntry}>Save</button>
-      <div className="journal-list">
-        {logs.map((log, i) => (
-          <div key={i} className="log">
-            <div><strong>{new Date(log.timestamp).toLocaleString()}</strong></div>
-            <div>{log.entry}</div>
-            {log.sentiment && <small>Sentiment: {log.sentiment}</small>}
-          </div>
-        ))}
+    <div className="journal-page">
+      <h2>Journal Entries</h2>
+      <div className="user-list">
+        <h3>Users</h3>
+        <ul>
+          {users.map((user) => (
+            <li key={user.username} onClick={() => fetchJournalEntries(user.username)}>
+              {user.username} ({user.role})
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="journal-entries">
+        <h3>{selectedUser ? `${selectedUser}'s Journal Entries` : 'Select a user to view their journal entries'}</h3>
+        <ul>
+          {journalEntries.map((entry, i) => (
+            <li key={i}>
+              <p>{entry.entry}</p>
+              <span>Sentiment: {entry.sentiment}</span>
+              <span>{new Date(entry.timestamp).toLocaleString()}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

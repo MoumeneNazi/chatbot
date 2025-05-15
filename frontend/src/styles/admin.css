@@ -1,0 +1,54 @@
+.admin-dashboard {
+    max-width: 1000px;
+    margin: 100px auto;
+    padding: 2rem;
+  }
+  
+  .user-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+  }
+  
+  .user-card {
+    background: #f3f4f6;
+    padding: 1rem;
+    border-radius: 8px;
+    flex: 1 1 250px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  }
+  
+  .user-card h4 {
+    margin-bottom: 0.3rem;
+  }
+  
+  .user-card p {
+    font-size: 0.9rem;
+    color: #4b5563;
+  }
+  
+  .user-card button {
+    margin-top: 0.5rem;
+    margin-right: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    background: #667eea;
+    color: white;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  
+  .user-card button:hover {
+    background: #5a67d8;
+  }
+  
+
+  .user-card button:nth-child(4) {
+    background: #38a169;
+  }
+  
+  .user-card button:nth-child(4):hover {
+    background: #2f855a;
+  }
+  

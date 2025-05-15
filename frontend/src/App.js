@@ -1,38 +1,62 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Navbar from './components/Navbar';
-import { useReveal } from './hooks/useReveal';
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Home from "./pages/Home";
+import Chat from "./pages/Chat";
+import Journal from "./pages/Journal";
+import Progress from "./pages/Progress";
+import TherapistDashboard from "./pages/TherapistDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
+import About from "./pages/About";
+import Contact from "./pages/Contact"; // previously 'Conatct'
+import UserDashboard from "./pages/UserDashboard";     
+import ProgressPage from "./pages/Progress";           
+import JournalPage from "./pages/Journal";             
 
-import Home from './pages/Home';
-import About from './pages/About';
-import Contact from './pages/Conatct';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Chat from './pages/Chat';
-import Journal from './pages/Journal';
-import Progress from './pages/Progress';
-import Therapist from './pages/Therapist';
 
-function App() {
-  useReveal(); // enables scroll animation
+
+const App = () => {
+  const userRole = localStorage.getItem("role");
+
   return (
-    <BrowserRouter>
-      <Navbar />
-      <main>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/chat" element={<Chat />} />
-          <Route path="/journal" element={<Journal />} />
-          <Route path="/progress" element={<Progress />} />
-          <Route path="/therapist" element={<Therapist />} />
-        </Routes>
-      </main>
-    </BrowserRouter>
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+
+        {/* User Dashboard */}
+        <Route
+          path="/user/dashboard"
+          element={
+            userRole === "user" ? <UserDashboard /> : <Navigate to="/login" />
+          }
+        />
+
+        {/* Therapist Dashboard */}
+        <Route
+          path="/therapist/dashboard"
+          element={
+            userRole === "therapist" ? <TherapistDashboard /> : <Navigate to="/login" />
+          }
+        />
+        <Route
+          path="/therapist/progress"
+          element={
+            userRole === "therapist" ? <ProgressPage /> : <Navigate to="/login" />
+          }
+        />
+        <Route
+          path="/therapist/journal"
+          element={
+            userRole === "therapist" ? <JournalPage /> : <Navigate to="/login" />
+          }
+        />
+
+        {/* Redirect unknown paths to login */}
+        <Route path="*" element={<Navigate to="/login" />} />
+      </Routes>
+    </Router>
   );
-}
+};
 
 export default App;

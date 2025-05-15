@@ -1,0 +1,78 @@
+.
+├── Backend
+│   ├── app.py
+│   ├── auth.py
+│   ├── chatbot.py
+│   ├── config.py
+│   ├── database.py
+│   ├── journal_entries.json
+│   ├── journal.py
+│   ├── models.py
+│   ├── __pycache__
+│   │   ├── app.cpython-312.pyc
+│   │   ├── auth.cpython-312.pyc
+│   │   ├── chatbot.cpython-312.pyc
+│   │   ├── config.cpython-312.pyc
+│   │   ├── database.cpython-312.pyc
+│   │   ├── journal.cpython-312.pyc
+│   │   ├── models.cpython-312.pyc
+│   │   ├── schemas.cpython-312.pyc
+│   │   ├── security.cpython-312.pyc
+│   │   └── therapist.cpython-312.pyc
+│   ├── schemas.py
+│   ├── security.py
+│   ├── session_memory.json
+│   ├── test_bcrypt.py
+│   ├── test_token.py
+│   ├── therapist.py
+│   └── users.db
+├── frontend
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── public
+│   │   └── index.html
+│   ├── README.md
+│   └── src
+│       ├── api.js
+│       ├── App.js
+│       ├── auth.js
+│       ├── components
+│       │   ├── Navbar.css
+│       │   └── Navbar.js
+│       ├── hooks
+│       │   └── useReveal.js
+│       ├── index.js
+│       ├── pages
+│       │   ├── About.js
+│       │   ├── AdminDashboard.js
+│       │   ├── Chat.js
+│       │   ├── Conatct.js
+│       │   ├── Home.css
+│       │   ├── HomeDetailed.css
+│       │   ├── Home.js
+│       │   ├── Journal.js
+│       │   ├── Login.js
+│       │   ├── Progress.js
+│       │   ├── Register.js
+│       │   ├── TherapistDashboard.js
+│       │   └── Therapist.js
+│       └── styles
+│           ├── admin.css
+│           ├── animations.css
+│           ├── auth.css
+│           ├── base.css
+│           ├── chat.css
+│           ├── Home.css
+│           ├── journal.css
+│           ├── navbar.css
+│           ├── pages.css
+│           ├── progress.css
+│           ├── responsive.css
+│           ├── therapist.css
+│           └── therapistDashboard.css
+├── models
+├── readme.md
+├── requirements.txt
+└── structure.txt
+
+10 directories, 66 files

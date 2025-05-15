@@ -12,15 +12,22 @@ PASSWORD = "mimo2021"
 
 class MentalHealthChatbot:
     def __init__(self, uri, user, password, memory_file="session_memory.json"):
-        self.driver          = GraphDatabase.driver(uri, auth=(user, password))
-        self.memory_file     = memory_file
+        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+        self.memory_file = memory_file
         self.session_context = self.load_session()
-        self.symptom_list    = self.load_symptom_list()
+        self.symptom_list = self.load_symptom_list()
+        self.disorder_list = self.load_disorder_list()  # Dynamically load disorders
 
     def load_symptom_list(self):
-        """Load all symptom names so we only match full names."""
+        """Load all symptom names from the Neo4j database."""
         with self.driver.session() as session:
             result = session.run("MATCH (s:Symptom) RETURN s.name AS name")
+            return [r["name"] for r in result]
+
+    def load_disorder_list(self):
+        """Load all disorder names from the Neo4j database."""
+        with self.driver.session() as session:
+            result = session.run("MATCH (d:Disorder) RETURN d.name AS name")
             return [r["name"] for r in result]
 
     def load_session(self):
@@ -51,7 +58,7 @@ class MentalHealthChatbot:
         return [name for name in self.symptom_list if name.lower() in low]
 
     def diagnose_disorders(self, symptoms):
-        """Graph‐based approximate matching."""
+        """Graph-based approximate matching for disorders based on symptoms."""
         query = """
         MATCH (s:Symptom)-[:INDICATES]->(d:Disorder)
         WHERE s.name IN $symptoms
@@ -62,7 +69,7 @@ class MentalHealthChatbot:
             result = session.run(query, symptoms=symptoms)
             preds, total = [], max(len(symptoms), 1)
             for r in result:
-                preds.append((r["disorder"], min(100, (r["score"]/total)*100)))
+                preds.append((r["disorder"], min(100, (r["score"] / total) * 100)))
             return preds
 
     def add_journal_entry(self, entry, mood_rating):
@@ -95,6 +102,29 @@ class MentalHealthChatbot:
         return prompts.get(symptom, "Would you like to talk more about what's been going on?")
 
     def chat(self, user_input):
+        # Normalize user input to lowercase for consistent checks
+        normalized_input = user_input.lower()
+
+        # Handle specific cases
+        if normalized_input in ["what is your purpose?", "why are you here?", "what do you do?"]:
+            return "I am here to assist you with mental health-related questions and provide support."
+
+        if normalized_input in ["who created you?", "who made you?"]:
+            return "I was created by a team of developers to help users with mental health support."
+
+        if normalized_input in ["how can you help me?", "what can you do?"]:
+            return "I can provide mental health resources, help you track your mood, and assist with journaling."
+
+        # Check if the user input mentions a disorder
+        for disorder in self.disorder_list:
+            if disorder.lower() in normalized_input:
+                return f"It sounds like you're asking about **{disorder}**. Would you like to know more about it?"
+
+        # Check if the user input mentions a symptom
+        found_symptoms = self.extract_symptoms(user_input)
+        if found_symptoms:
+            return f"I noticed you mentioned the symptom(s): {', '.join(found_symptoms)}. Would you like to explore how these might relate to your mental health?"
+
         # 1) record
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.session_context["session_history"].append({
@@ -117,7 +147,7 @@ class MentalHealthChatbot:
             return "I hear you're asking for clarification. Could you specify what you need more details about?"
 
         # 4) greetings
-        if user_input in ["hello", "hi", "hey", "good morning", "good evening"]:
+        if normalized_input in ["hello", "hi", "hey", "good morning", "good evening"]:
             return random.choice([
                 "Hello! 😊 How have you been feeling lately?",
                 "Hi there! What’s been on your mind today?",
@@ -125,7 +155,7 @@ class MentalHealthChatbot:
             ])
 
         # 5) farewells
-        if user_input in ["bye", "goodbye", "quit", "exit"]:
+        if normalized_input in ["bye", "goodbye", "quit", "exit"]:
             return random.choice([
                 "Take care of yourself. 💙",
                 "Goodbye! I'm here if you need me.",
