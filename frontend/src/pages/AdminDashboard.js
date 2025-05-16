@@ -6,9 +6,16 @@ function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [error, setError] = useState('');
   const token = localStorage.getItem('token');
+  const role = localStorage.getItem('role');
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Only allow therapist role
+    if (!token || role !== "therapist") {
+      navigate("/login");
+      return;
+    }
+
     const fetchUsers = async () => {
       try {
         const res = await fetch('http://localhost:8000/admin/users', {
@@ -25,7 +32,7 @@ function AdminDashboard() {
       }
     };
     fetchUsers();
-  }, [token]);
+  }, [token, role, navigate]);
 
   const promoteUser = async (username) => {
     try {
@@ -51,9 +58,6 @@ function AdminDashboard() {
       alert('Server error');
     }
   };
-  
-
-
 
   const viewJournal = (username) => navigate(`/therapist?username=${username}`);
   const viewChat = (username) => navigate(`/therapist/chat/${username}`);
@@ -70,8 +74,8 @@ function AdminDashboard() {
             <button onClick={() => viewJournal(u.username)}>View Journal</button>
             <button onClick={() => viewChat(u.username)}>View Chat</button>
             {u.role !== "therapist" && (
-            <button onClick={() => promoteUser(u.username)}>Promote</button>
-          )}
+              <button onClick={() => promoteUser(u.username)}>Promote</button>
+            )}
           </div>
         ))}
       </div>

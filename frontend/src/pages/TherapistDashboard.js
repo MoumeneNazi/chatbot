@@ -1,89 +1,86 @@
-import React, { useEffect, useState } from "react";
-import axios from "../api";
-import "../styles/therapistDashboard.css";
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import '../styles/admin.css';
 
-const TherapistDashboard = () => {
+function TherapistDashboard() {
   const [users, setUsers] = useState([]);
-  const [statusMsg, setStatusMsg] = useState("");
-
-  const token = localStorage.getItem("token");
+  const [error, setError] = useState('');
+  const token = localStorage.getItem('token');
+  const role = localStorage.getItem('role');
+  const navigate = useNavigate();
 
   useEffect(() => {
-    axios
-      .get("/admin/users", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        setUsers(res.data);
-      })
-      .catch((err) => {
-        console.error("Error fetching users", err);
-      });
-  }, [token]);
+    // Logic fix: Only allow therapist role
+    if (!token || role !== "therapist") {
+      navigate("/login");
+      return;
+    }
 
-  const promoteUser = (username) => {
-    axios
-      .put(`/admin/promote/${username}`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        setStatusMsg(res.data.msg);
-        setUsers((prev) =>
-          prev.map((u) =>
-            u.username === username ? { ...u, role: "therapist" } : u
+    const fetchUsers = async () => {
+      try {
+        const res = await fetch('http://localhost:8000/admin/users', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setUsers(data);
+        } else {
+          setError(data.detail || 'Access denied');
+        }
+      } catch {
+        setError('Server error');
+      }
+    };
+    fetchUsers();
+  }, [token, role, navigate]);
+
+  const promoteUser = async (username) => {
+    try {
+      const res = await fetch(`http://localhost:8000/admin/promote/${username}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.msg);
+        // Refresh user list
+        setUsers(prev =>
+          prev.map(u =>
+            u.username === username ? { ...u, role: 'therapist' } : u
           )
         );
-      })
-      .catch((err) => {
-        setStatusMsg("Failed to promote user.");
-        console.error("Promotion failed", err);
-      });
+      } else {
+        alert(data.detail || 'Failed to promote');
+      }
+    } catch {
+      alert('Server error');
+    }
   };
 
-  return (
-    <div className="therapist-dashboard">
-      <h2>🩺 Therapist Admin Dashboard</h2>
-      {statusMsg && <div className="status-msg">{statusMsg}</div>}
+  const viewJournal = (username) => navigate(`/therapist?username=${username}`);
+  const viewChat = (username) => navigate(`/therapist/chat/${username}`);
 
-      <table>
-        <thead>
-          <tr>
-            <th>Username</th>
-            <th>Role</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((u) => (
-            <tr key={u.username}>
-              <td>{u.username}</td>
-              <td>{u.role}</td>
-              <td>
-                {u.role !== "therapist" && (
-                  <button onClick={() => promoteUser(u.username)}>Promote</button>
-                )}
-                <a
-                  href={`/therapist/journal?user=${u.username}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  View Journal
-                </a>{" "}
-                |{" "}
-                <a
-                  href={`/therapist/chat?user=${u.username}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  View Chat
-                </a>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+  return (
+    <div className="admin-dashboard">
+      <h2>Therapist Dashboard</h2>
+      {error && <p className="error">{error}</p>}
+      <div className="user-list">
+        {users.map((u, i) => (
+          <div key={i} className="user-card">
+            <h4>{u.username}</h4>
+            <p>Role: {u.role}</p>
+            <button onClick={() => viewJournal(u.username)}>View Journal</button>
+            <button onClick={() => viewChat(u.username)}>View Chat</button>
+            {u.role !== "therapist" && (
+              <button onClick={() => promoteUser(u.username)}>Promote</button>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
-};
+}
 
 export default TherapistDashboard;

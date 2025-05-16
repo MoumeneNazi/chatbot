@@ -1,3 +1,4 @@
+from fastapi import APIRouter
 from neo4j import GraphDatabase
 import json
 import os
@@ -6,6 +7,11 @@ from datetime import datetime
 from textblob import TextBlob
 from groq import Groq
 from dotenv import load_dotenv
+
+
+
+
+router = APIRouter()
 
 # Load environment variables for Groq API
 load_dotenv()

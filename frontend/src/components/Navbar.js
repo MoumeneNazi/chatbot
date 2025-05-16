@@ -15,7 +15,7 @@ function Navbar() {
     const currentRole = localStorage.getItem('role');
     setIsAuthenticated(!!token);
     setRole(currentRole);
-  }, [location]); // re-run on every route change
+  }, [location]);
 
   const handleLogout = () => {
     logout();
@@ -35,7 +35,6 @@ function Navbar() {
         <Link to="/testimonials">Testimonials</Link>
         <Link to="/contact">Contact</Link>
       </div>
-
       <div className="nav-right">
         {isAuthenticated ? (
           <>

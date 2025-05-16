@@ -13,18 +13,22 @@ function Login() {
     e.preventDefault();
     setError('');
     try {
+      // Create form-encoded data
+      const params = new URLSearchParams();
+      params.append('username', form.username);
+      params.append('password', form.password);
+
       const res = await fetch('http://localhost:8000/token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        console.log("data",data)
         localStorage.setItem('token', data.access_token);
-        localStorage.setItem('role', data.role); // Make sure backend sends role
+        localStorage.setItem('role', data.role);
 
         if (data.role === 'therapist') {
           navigate('/therapist/dashboard');
@@ -34,7 +38,7 @@ function Login() {
           navigate('/');
         }
       } else {
-        setError(data.detail || 'Login failed');
+        setError(data.detail || data.msg || data || 'Login failed');
       }
     } catch {
       setError('Server error');
@@ -61,7 +65,17 @@ function Login() {
           autoComplete="current-password"
         />
         <button type="submit">Login</button>
-        {error && <p className="error">{error}</p>}
+        {Array.isArray(error) ? (
+          error.map((err, idx) => (
+            <p className="error" key={idx}>{err.msg}</p>
+          ))
+        ) : error ? (
+          <p className="error">
+            {typeof error === 'string'
+              ? error
+              : error.msg || error.detail || JSON.stringify(error)}
+          </p>
+        ) : null}
       </form>
       <p>
         Don't have an account? <a href="/register">Register</a>

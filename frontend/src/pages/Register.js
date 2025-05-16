@@ -19,10 +19,11 @@ function Register() {
         body: JSON.stringify(form),
       });
 
+      const data = await res.json();
+
       if (res.ok) {
         navigate('/login');
       } else {
-        const data = await res.json();
         setError(data.detail || 'Registration failed');
       }
     } catch {
@@ -37,11 +38,21 @@ function Register() {
         <input name="username" placeholder="Username" onChange={handleChange} required />
         <input name="password" type="password" placeholder="Password" onChange={handleChange} required />
         <button type="submit">Register</button>
-        {error && <p className="error">{error}</p>}
-      </form>
-      <p>Already have an account? <a href="/login">Login</a></p>
-    </div>
-  );
+        {Array.isArray(error) ? (
+           error.map((err, idx) => (
+          <p className="error" key={idx}>{err.msg}</p>
+         ))
+        ) : error ? (
+          <p className="error">
+             {typeof error === 'string'
+             ? error
+             : error.msg || error.detail || JSON.stringify(error)}
+          </p>
+        ) : null}
+          </form>
+          <p>Already have an account? <a href="/login">Login</a></p>
+          </div>
+    );
 }
 
 export default Register;

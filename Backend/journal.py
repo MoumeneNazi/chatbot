@@ -1,49 +1,13 @@
-import os
-import json
-from datetime import datetime
-from textblob import TextBlob
-from collections import Counter
-from datetime import date
+from fastapi import APIRouter, Depends, HTTPException
+from models import User
+from dependencies import require_role
+from database import get_journal_by_username
 
-JOURNAL_FILE = "journal_entries.json"
+router = APIRouter()
 
-def load_journal():
-    if not os.path.exists(JOURNAL_FILE):
-        return []
-    with open(JOURNAL_FILE, "r") as f:
-        return json.load(f)
-
-def analyze_sentiment(text):
-    polarity = TextBlob(text).sentiment.polarity
-    if polarity > 0.2:
-        return "positive"
-    elif polarity < -0.2:
-        return "negative"
-    else:
-        return "neutral"
-
-
-def get_sentiment_summary():
-    entries = load_journal()
-    today = date.today()
-    sentiments = [e.get("sentiment", "unknown") for e in entries if e["timestamp"].startswith(str(today))]
-    count = Counter(sentiments)
-    return {
-        "date": str(today),
-        "summary": count
-    }
-
-def save_entry(user_input: str):
-    sentiment = analyze_sentiment(user_input)
-    entry = {
-        "timestamp": str(datetime.now()),
-        "entry": user_input,
-        "sentiment": sentiment
-    }
-    entries = load_journal()
-    entries.append(entry)
-    with open(JOURNAL_FILE, "w") as f:
-        json.dump(entries, f, indent=4)
-    return entry
-def get_entries():
-    return load_journal()
+@router.get("/admin/journal/{username}")
+def get_journal(username: str, current_user: User = Depends(require_role("therapist"))):
+    journal = get_journal_by_username(username)
+    if not journal:
+        raise HTTPException(status_code=404, detail="No journal found")
+    return journal
