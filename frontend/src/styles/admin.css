@@ -1,7 +1,7 @@
 .admin-dashboard {
-    max-width: 1000px;
-    margin: 100px auto;
-    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem;
   }
   
   .user-list {
@@ -50,5 +50,17 @@
   
   .user-card button:nth-child(4):hover {
     background: #2f855a;
+  }
+  
+  .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+  }
+  
+  .dashboard-header h2 {
+    margin: 0;
+    color: #333;
   }
   

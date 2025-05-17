@@ -1,33 +1,40 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import api from '../api';
 import '../styles/auth.css';
 
 function Register() {
   const [form, setForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { token } = useAuth();
+
+  // Only redirect if already logged in AND trying to access register page
+  useEffect(() => {
+    if (token && window.location.pathname === '/register') {
+      navigate('/');
+    }
+  }, [token, navigate]);
 
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async e => {
     e.preventDefault();
     setError('');
+    
     try {
-      const res = await fetch('http://localhost:8000/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        navigate('/login');
+      await api.post('/auth/register', form);
+      // Show success message and redirect to login
+      alert('Registration successful! Please login with your credentials.');
+      navigate('/login');
+    } catch (err) {
+      console.error('Registration error:', err.response || err);
+      if (err.response?.status === 400 && err.response?.data?.detail?.includes('already exists')) {
+        setError('Username already exists. Please choose a different username.');
       } else {
-        setError(data.detail || 'Registration failed');
+        setError(err.response?.data?.detail || 'Registration failed. Please try again.');
       }
-    } catch {
-      setError('Server error');
     }
   };
 
@@ -35,24 +42,38 @@ function Register() {
     <div className="auth-page">
       <h2>Register</h2>
       <form onSubmit={handleSubmit}>
-        <input name="username" placeholder="Username" onChange={handleChange} required />
-        <input name="password" type="password" placeholder="Password" onChange={handleChange} required />
+        <input 
+          name="username" 
+          placeholder="Username"
+          value={form.username}
+          onChange={handleChange} 
+          required 
+          autoComplete="username"
+          minLength="3"
+          maxLength="20"
+          pattern="[a-zA-Z0-9_-]+"
+          title="Username can only contain letters, numbers, underscores and hyphens"
+        />
+        <input 
+          name="password" 
+          type="password" 
+          placeholder="Password"
+          value={form.password}
+          onChange={handleChange} 
+          required 
+          autoComplete="new-password"
+          minLength="6"
+        />
         <button type="submit">Register</button>
-        {Array.isArray(error) ? (
-           error.map((err, idx) => (
-          <p className="error" key={idx}>{err.msg}</p>
-         ))
-        ) : error ? (
+        {error && (
           <p className="error">
-             {typeof error === 'string'
-             ? error
-             : error.msg || error.detail || JSON.stringify(error)}
+            {typeof error === 'string' ? error : JSON.stringify(error)}
           </p>
-        ) : null}
-          </form>
-          <p>Already have an account? <a href="/login">Login</a></p>
-          </div>
-    );
+        )}
+      </form>
+      <p>Already have an account? <Link to="/login">Login</Link></p>
+    </div>
+  );
 }
 
 export default Register;

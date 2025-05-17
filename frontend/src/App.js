@@ -5,11 +5,13 @@ import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import AdminDashboard from "./pages/AdminDashboard";
+import TherapistDashboard from "./pages/TherapistDashboard";
 import Chat from "./pages/Chat";
-import UserDashboard from "./pages/UserDashboard";
 import Progress from "./pages/Progress";
 import Journal from "./pages/Journal";
+import Review from "./pages/Review";
+import AddReview from "./pages/AddReview";
+import Therapist from "./pages/Therapist";
 
 const ProtectedRoute = ({ children, roles }) => {
   const { role, token } = useAuth();
@@ -19,9 +21,12 @@ const ProtectedRoute = ({ children, roles }) => {
 
 const AppRoutes = () => (
   <Routes>
+    {/* Public Routes */}
     <Route path="/" element={<Home />} />
     <Route path="/login" element={<Login />} />
     <Route path="/register" element={<Register />} />
+
+    {/* User Routes */}
     <Route
       path="/chat"
       element={
@@ -31,37 +36,65 @@ const AppRoutes = () => (
       }
     />
     <Route
-      path="/user/dashboard"
+      path="/journal"
       element={
         <ProtectedRoute roles={["user"]}>
-          <UserDashboard />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/admin/dashboard"
-      element={
-        <ProtectedRoute roles={["therapist"]}>
-          <AdminDashboard />
+          <Journal />
         </ProtectedRoute>
       }
     />
     <Route
       path="/progress"
       element={
-        <ProtectedRoute roles={["therapist"]}>
+        <ProtectedRoute roles={["user"]}>
           <Progress />
         </ProtectedRoute>
       }
     />
     <Route
-      path="/journal"
+      path="/reviews"
       element={
-        <ProtectedRoute roles={["therapist"]}>
-          <Journal />
+        <ProtectedRoute roles={["user", "therapist"]}>
+          <Review />
         </ProtectedRoute>
       }
     />
+
+    {/* Therapist Routes */}
+    <Route
+      path="/therapist/dashboard"
+      element={
+        <ProtectedRoute roles={["therapist"]}>
+          <TherapistDashboard />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/therapist/reviews/add"
+      element={
+        <ProtectedRoute roles={["therapist"]}>
+          <AddReview />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/therapist/chat/:userId"
+      element={
+        <ProtectedRoute roles={["therapist"]}>
+          <Chat />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/therapist/user/:userId"
+      element={
+        <ProtectedRoute roles={["therapist"]}>
+          <Therapist />
+        </ProtectedRoute>
+      }
+    />
+
+    {/* Fallback Route */}
     <Route path="*" element={<Navigate to="/" />} />
   </Routes>
 );

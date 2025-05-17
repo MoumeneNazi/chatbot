@@ -1,62 +1,54 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { getToken, logout } from '../auth';
+import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.png';
 import '../styles/navbar.css';
 
 function Navbar() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [role, setRole] = useState(localStorage.getItem('role'));
-  const [isAuthenticated, setIsAuthenticated] = useState(!!getToken());
+  const { token, role, logout } = useAuth();
 
-  useEffect(() => {
-    const token = getToken();
-    const currentRole = localStorage.getItem('role');
-    setIsAuthenticated(!!token);
-    setRole(currentRole);
-  }, [location]);
-
-  const handleLogout = () => {
-    logout();
-    setIsAuthenticated(false);
-    setRole(null);
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
   return (
     <nav className="navbar">
       <div className="nav-left">
-        <Link to="/">
+        <Link to="/" className="logo-link">
           <img src={logo} alt="MindCompanion" className="logo" />
         </Link>
         <Link to="/">Home</Link>
         <Link to="/about">About</Link>
-        <Link to="/testimonials">Testimonials</Link>
         <Link to="/contact">Contact</Link>
       </div>
       <div className="nav-right">
-        {isAuthenticated ? (
+        {token ? (
           <>
             {role === 'user' && (
               <>
                 <Link to="/chat">Chat</Link>
-                <Link to="/user/dashboard">Dashboard</Link>
+                <Link to="/journal">Journal</Link>
+                <Link to="/progress">Progress</Link>
+                <Link to="/reviews">Therapist Insights</Link>
               </>
             )}
             {role === 'therapist' && (
               <>
                 <Link to="/therapist/dashboard">Dashboard</Link>
-                <Link to="/therapist/progress">Progress</Link>
-                <Link to="/therapist/journal">Journal</Link>
+                <Link to="/reviews">View Reviews</Link>
+                <Link to="/therapist/reviews/add">Add Review</Link>
               </>
             )}
-            <button className="glow" onClick={handleLogout}>Logout</button>
+            <button onClick={handleLogout} className="logout-btn">
+              Logout
+            </button>
           </>
         ) : (
           <>
-            <Link to="/login">Login</Link>
-            <Link to="/register">Register</Link>
+            <Link to="/login" className="login-btn">Login</Link>
+            <Link to="/register" className="register-btn">Register</Link>
           </>
         )}
       </div>

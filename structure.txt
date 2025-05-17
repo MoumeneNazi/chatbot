@@ -1,78 +1,79 @@
-.
-├── Backend
-│   ├── app.py
-│   ├── auth.py
-│   ├── chatbot.py
-│   ├── config.py
-│   ├── database.py
-│   ├── journal_entries.json
-│   ├── journal.py
-│   ├── models.py
-│   ├── __pycache__
-│   │   ├── app.cpython-312.pyc
-│   │   ├── auth.cpython-312.pyc
-│   │   ├── chatbot.cpython-312.pyc
-│   │   ├── config.cpython-312.pyc
-│   │   ├── database.cpython-312.pyc
-│   │   ├── journal.cpython-312.pyc
-│   │   ├── models.cpython-312.pyc
-│   │   ├── schemas.cpython-312.pyc
-│   │   ├── security.cpython-312.pyc
-│   │   └── therapist.cpython-312.pyc
-│   ├── schemas.py
-│   ├── security.py
-│   ├── session_memory.json
-│   ├── test_bcrypt.py
-│   ├── test_token.py
-│   ├── therapist.py
-│   └── users.db
-├── frontend
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── public
-│   │   └── index.html
-│   ├── README.md
-│   └── src
-│       ├── api.js
-│       ├── App.js
-│       ├── auth.js
-│       ├── components
-│       │   ├── Navbar.css
-│       │   └── Navbar.js
-│       ├── hooks
-│       │   └── useReveal.js
-│       ├── index.js
-│       ├── pages
-│       │   ├── About.js
-│       │   ├── AdminDashboard.js
-│       │   ├── Chat.js
-│       │   ├── Conatct.js
-│       │   ├── Home.css
-│       │   ├── HomeDetailed.css
-│       │   ├── Home.js
-│       │   ├── Journal.js
-│       │   ├── Login.js
-│       │   ├── Progress.js
-│       │   ├── Register.js
-│       │   ├── TherapistDashboard.js
-│       │   └── Therapist.js
-│       └── styles
-│           ├── admin.css
-│           ├── animations.css
-│           ├── auth.css
-│           ├── base.css
-│           ├── chat.css
-│           ├── Home.css
-│           ├── journal.css
-│           ├── navbar.css
-│           ├── pages.css
-│           ├── progress.css
-│           ├── responsive.css
-│           ├── therapist.css
-│           └── therapistDashboard.css
-├── models
-├── readme.md
-├── requirements.txt
-└── structure.txt
+Project Structure
+================
 
-10 directories, 66 files
+Backend/
+├── __init__.py
+├── main.py              # FastAPI application entry point
+├── database.py          # Database configuration and session management
+├── models.py            # SQLAlchemy and Pydantic models
+├── auth.py             # Authentication and authorization
+├── chat.py             # Chat-related endpoints
+├── journal.py          # Journal-related endpoints
+├── review.py           # Review system endpoints
+├── therapist.py        # Therapist-specific endpoints
+├── utils/
+│   ├── __init__.py
+│   ├── ai.py           # AI integration utilities
+│   ├── security.py     # Security utilities
+│   └── validators.py   # Input validation utilities
+└── tests/
+    ├── __init__.py
+    ├── test_auth.py
+    ├── test_chat.py
+    └── test_journal.py
+
+frontend/
+├── public/
+│   ├── index.html
+│   ├── favicon.ico
+│   └── assets/
+├── src/
+│   ├── api.js          # API configuration
+│   ├── App.js          # Main application component
+│   ├── index.js        # Application entry point
+│   ├── components/
+│   │   ├── Navbar.js
+│   │   └── ProtectedRoute.js
+│   ├── context/
+│   │   └── AuthContext.js
+│   ├── hooks/
+│   │   └── usePromoteUser.js
+│   ├── pages/
+│   │   ├── Home.js
+│   │   ├── Login.js
+│   │   ├── Register.js
+│   │   ├── Chat.js
+│   │   ├── Journal.js
+│   │   ├── Progress.js
+│   │   ├── Review.js
+│   │   ├── AddReview.js
+│   │   ├── TherapistDashboard.js
+│   │   └── Therapist.js
+│   └── styles/
+│       ├── auth.css
+│       ├── chat.css
+│       ├── journal.css
+│       ├── navbar.css
+│       ├── pages.css
+│       ├── review.css
+│       └── therapist.css
+└── package.json
+
+config/
+├── .env.example        # Environment variables template
+└── config.py          # Configuration management
+
+docs/
+├── api.md             # API documentation
+├── setup.md           # Setup instructions
+└── contributing.md    # Contributing guidelines
+
+scripts/
+├── init_db.py         # Database initialization
+└── seed_data.py       # Sample data generation
+
+.gitignore
+README.md
+requirements.txt
+structure.txt
+LICENSE

@@ -1,3 +1,23 @@
+/* Common page styles */
+.page-container {
+  padding-top: 80px; /* Adjust based on navbar height */
+  padding-bottom: 2rem;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .page-container {
+    padding-top: 70px;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
 /* Hero Section */
 .hero {
     background:linear-gradient(135deg,#667eea,#764ba2);

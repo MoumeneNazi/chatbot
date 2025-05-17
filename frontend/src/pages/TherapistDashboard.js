@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/admin.css';
+import '../styles/pages.css';
 
 function TherapistDashboard() {
   const [users, setUsers] = useState([]);
@@ -63,21 +64,31 @@ function TherapistDashboard() {
   const viewChat = (username) => navigate(`/therapist/chat/${username}`);
 
   return (
-    <div className="admin-dashboard">
-      <h2>Therapist Dashboard</h2>
-      {error && <p className="error">{error}</p>}
-      <div className="user-list">
-        {users.map((u, i) => (
-          <div key={i} className="user-card">
-            <h4>{u.username}</h4>
-            <p>Role: {u.role}</p>
-            <button onClick={() => viewJournal(u.username)}>View Journal</button>
-            <button onClick={() => viewChat(u.username)}>View Chat</button>
-            {u.role !== "therapist" && (
-              <button onClick={() => promoteUser(u.username)}>Promote</button>
-            )}
-          </div>
-        ))}
+    <div className="page-container">
+      <div className="admin-dashboard">
+        <div className="dashboard-header">
+          <h2>Therapist Dashboard</h2>
+          <button 
+            className="primary-button"
+            onClick={() => navigate('/reviews/add')}
+          >
+            Create New Review
+          </button>
+        </div>
+        {error && <p className="error">{error}</p>}
+        <div className="user-list">
+          {users.map((u, i) => (
+            <div key={i} className="user-card">
+              <h4>{u.username}</h4>
+              <p>Role: {u.role}</p>
+              <button onClick={() => viewJournal(u.username)}>View Journal</button>
+              <button onClick={() => viewChat(u.username)}>View Chat</button>
+              {u.role !== "therapist" && (
+                <button onClick={() => promoteUser(u.username)}>Promote</button>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

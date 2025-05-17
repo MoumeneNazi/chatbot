@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import '../styles/HomeUnified.css';  // NEW unified CSS file
+import '../styles/HomeUnified.css';  // Updated import path
 import { Link } from 'react-router-dom';
 
 export default function Home() {
@@ -87,7 +87,7 @@ export default function Home() {
           “Before MindCompanion, I struggled to express my feelings. Now I have a trusted companion that understands me.” – Sarah, 28
         </blockquote>
         <blockquote>
-          “The AI helps me see patterns I never noticed. It’s like having a therapist in my pocket.” – James, 34
+          “The AI helps me see patterns I never noticed. It's like having a therapist in my pocket.” – James, 34
         </blockquote>
       </section>
 
@@ -114,7 +114,7 @@ export default function Home() {
         <h2>Daily Self-Care Checklist</h2>
         <ol>
           <li>Take deep breaths for 5 minutes.</li>
-          <li>Write down 3 things you’re grateful for.</li>
+          <li>Write down 3 things you're grateful for.</li>
           <li>Check in with your mood using our AI chat.</li>
           <li>Reach out to a friend or therapist if needed.</li>
           <li>Practice mindful meditation or stretching.</li>
