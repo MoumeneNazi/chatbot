@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import api from '../api';
 import '../styles/review.css';
 import '../styles/pages.css';
 
@@ -47,9 +47,7 @@ const Review = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await api.get('/api/admin/users', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/api/users');
       const filteredUsers = response.data.filter(user => user.role === 'user');
       setUsers(filteredUsers);
       setError(null);
@@ -61,9 +59,7 @@ const Review = () => {
 
   const fetchUserDetails = async (userId) => {
     try {
-      const response = await axios.get(`/api/users/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/api/users/${userId}`);
       setSelectedUser(response.data);
     } catch (err) {
       console.error('Error fetching user details:', err);
@@ -87,14 +83,19 @@ const Review = () => {
         url += `?${params.toString()}`;
       }
 
-      const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(url);
       setReviews(response.data);
       setError(null);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load reviews');
       console.error('Error fetching reviews:', err);
+      // Handle error message properly
+      const errorMessage = err.response?.data?.detail;
+      if (Array.isArray(errorMessage)) {
+        // Handle FastAPI validation errors
+        setError(errorMessage.map(err => err.msg).join(', '));
+      } else {
+        setError(errorMessage || err.message || 'Failed to load reviews');
+      }
     } finally {
       setLoading(false);
     }
@@ -102,10 +103,8 @@ const Review = () => {
 
   const fetchSymptoms = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/symptoms${selectedCategory !== 'all' ? `?disorder=${selectedCategory}` : ''}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const url = `/api/symptoms${selectedCategory !== 'all' ? `?disorder=${selectedCategory}` : ''}`;
+      const response = await api.get(url);
       setSymptoms(response.data);
     } catch (err) {
       console.error('Error fetching symptoms:', err);
@@ -348,15 +347,14 @@ const Review = () => {
                   <span className="category-tag">{review.disorder}</span>
                 </div>
                 <div className="therapist-info">
-                  <img src={review.therapistAvatar || '/default-avatar.png'} alt="Therapist" />
                   <div>
-                    <p className="therapist-name">Dr. {review.therapistName}</p>
+                    <p className="therapist-name">{review.therapist_name}</p>
                     <p className="therapist-specialty">{review.specialty}</p>
                   </div>
                 </div>
                 <p className="review-content">{review.content}</p>
                 <div className="review-footer">
-                  <span className="date">{new Date(review.createdAt).toLocaleDateString()}</span>
+                  <span className="date">{new Date(review.timestamp).toLocaleDateString()}</span>
                   {role === 'user' && (
                     <div className="review-actions">
                       <button className="action-button">Save</button>

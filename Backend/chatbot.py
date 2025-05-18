@@ -1,22 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from neo4j import GraphDatabase
 import json
 import os
 import random
 from datetime import datetime
 from textblob import TextBlob
-from groq import Groq
+import groq
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from auth import get_current_user
+from dependencies import get_current_user, check_user_role
 from database import get_db
 from sqlalchemy.orm import Session
-from models import ChatMessageModel
+from models import ChatMessageModel, User
 import logging
 import re
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load environment variables for Groq API
@@ -24,14 +24,17 @@ env_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=env_path)
 logger.info(f"Loading .env from: {env_path}")
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/api",
+    tags=["chat"]
+)
 
 # Get environment variables
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY not found in .env file. Please add it to Backend/.env")
 
-groq_client = Groq(api_key=GROQ_API_KEY)
+groq_client = groq.Groq(api_key=GROQ_API_KEY)
 
 # Neo4j connection details
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
@@ -53,41 +56,74 @@ class ChatMessage(BaseModel):
     message: str
 
 @router.post("/chat")
-async def chat_endpoint(message: ChatMessage, current_user = Depends(get_current_user), db: Session = Depends(get_db)):
+async def send_message(
+    message: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     try:
-        # Store user message
+        # Create user message
         user_message = ChatMessageModel(
             user_id=current_user.id,
-            content=message.message,
-            role="user"
+            role="user",
+            content=message,
+            timestamp=datetime.utcnow()
         )
         db.add(user_message)
-        db.commit()
-
-        # Get chatbot response
-        response_text = ask_groq(message.message)
         
-        # Store bot response
+        # TODO: Add chatbot response logic here
+        bot_response = "I am here to help you. How are you feeling today?"
+        
+        # Create bot message
         bot_message = ChatMessageModel(
             user_id=current_user.id,
-            content=response_text,
-            role="assistant"
+            role="assistant",
+            content=bot_response,
+            timestamp=datetime.utcnow()
         )
         db.add(bot_message)
+        
         db.commit()
-
-        return {"response": response_text}
+        return {"message": bot_response}
     except Exception as e:
-        logger.error(f"Error in chat endpoint: {str(e)}")
         db.rollback()
+        logger.error(f"Error processing chat message: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to process message")
 
 @router.get("/chat/history")
-async def get_chat_history(current_user = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_chat_history(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         # Get all messages for the current user
         messages = db.query(ChatMessageModel).filter(
             ChatMessageModel.user_id == current_user.id
+        ).order_by(ChatMessageModel.timestamp).all()
+        
+        return [
+            {
+                "role": msg.role,
+                "content": msg.content,
+                "timestamp": msg.timestamp.isoformat()
+            }
+            for msg in messages
+        ]
+    except Exception as e:
+        logger.error(f"Error fetching chat history: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch chat history")
+
+@router.get("/chat/history/{user_id}")
+async def get_user_chat_history(
+    user_id: int,
+    current_user: User = Depends(lambda user: check_user_role(user, "therapist")),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Verify user exists
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        messages = db.query(ChatMessageModel).filter(
+            ChatMessageModel.user_id == user_id
         ).order_by(ChatMessageModel.timestamp).all()
         
         return [

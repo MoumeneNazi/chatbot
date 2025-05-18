@@ -12,10 +12,22 @@ import Journal from "./pages/Journal";
 import Review from "./pages/Review";
 import AddReview from "./pages/AddReview";
 import Therapist from "./pages/Therapist";
+import TherapistChat from "./pages/TherapistChat";
+import TherapistJournal from "./pages/TherapistJournal";
 
 const ProtectedRoute = ({ children, roles }) => {
-  const { role, token } = useAuth();
-  if (!token || (roles && !roles.includes(role))) return <Navigate to="/login" />;
+  const { token, hasPermission } = useAuth();
+  
+  // Check if user is authenticated
+  if (!token) {
+    return <Navigate to="/login" />;
+  }
+  
+  // Check if user has required role permissions
+  if (roles && !roles.some(role => hasPermission(role))) {
+    return <Navigate to="/" />;
+  }
+  
   return children;
 };
 
@@ -52,10 +64,18 @@ const AppRoutes = () => (
       }
     />
     <Route
-      path="/reviews"
+      path="/review"
       element={
         <ProtectedRoute roles={["user", "therapist"]}>
           <Review />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/reviews/add"
+      element={
+        <ProtectedRoute roles={["therapist"]}>
+          <AddReview />
         </ProtectedRoute>
       }
     />
@@ -70,23 +90,23 @@ const AppRoutes = () => (
       }
     />
     <Route
-      path="/therapist/reviews/add"
+      path="/therapist/chat/:username"
       element={
         <ProtectedRoute roles={["therapist"]}>
-          <AddReview />
+          <TherapistChat />
         </ProtectedRoute>
       }
     />
     <Route
-      path="/therapist/chat/:userId"
+      path="/therapist/journal/:username"
       element={
         <ProtectedRoute roles={["therapist"]}>
-          <Chat />
+          <TherapistJournal />
         </ProtectedRoute>
       }
     />
     <Route
-      path="/therapist/user/:userId"
+      path="/therapist"
       element={
         <ProtectedRoute roles={["therapist"]}>
           <Therapist />

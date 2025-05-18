@@ -39,39 +39,46 @@ function Register() {
   };
 
   return (
-    <div className="auth-page">
-      <h2>Register</h2>
-      <form onSubmit={handleSubmit}>
-        <input 
-          name="username" 
-          placeholder="Username"
-          value={form.username}
-          onChange={handleChange} 
-          required 
-          autoComplete="username"
-          minLength="3"
-          maxLength="20"
-          pattern="[a-zA-Z0-9_-]+"
-          title="Username can only contain letters, numbers, underscores and hyphens"
-        />
-        <input 
-          name="password" 
-          type="password" 
-          placeholder="Password"
-          value={form.password}
-          onChange={handleChange} 
-          required 
-          autoComplete="new-password"
-          minLength="6"
-        />
-        <button type="submit">Register</button>
-        {error && (
-          <p className="error">
-            {typeof error === 'string' ? error : JSON.stringify(error)}
-          </p>
-        )}
-      </form>
-      <p>Already have an account? <Link to="/login">Login</Link></p>
+    <div className="auth-container">
+      <div className="auth-box">
+        <h2>Register</h2>
+        {error && <div className="error-message">{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="username">Username</label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              value={form.username}
+              onChange={handleChange}
+              required
+              autoComplete="username"
+              minLength="3"
+              maxLength="20"
+              pattern="[a-zA-Z0-9_-]+"
+              title="Username can only contain letters, numbers, underscores and hyphens"
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              value={form.password}
+              onChange={handleChange}
+              required
+              autoComplete="new-password"
+              minLength="6"
+            />
+          </div>
+          <button type="submit" className="auth-button">Register</button>
+        </form>
+        <p className="auth-link">
+          Already have an account? <Link to="/login">Login</Link>
+        </p>
+      </div>
     </div>
   );
 }

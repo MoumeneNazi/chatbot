@@ -31,14 +31,14 @@ function Navbar() {
                 <Link to="/chat">Chat</Link>
                 <Link to="/journal">Journal</Link>
                 <Link to="/progress">Progress</Link>
-                <Link to="/reviews">Therapist Insights</Link>
+                <Link to="/review">Reviews</Link>
               </>
             )}
             {role === 'therapist' && (
               <>
                 <Link to="/therapist/dashboard">Dashboard</Link>
-                <Link to="/reviews">View Reviews</Link>
-                <Link to="/therapist/reviews/add">Add Review</Link>
+                <Link to="/review">Reviews</Link>
+                <Link to="/reviews/add">Add Review</Link>
               </>
             )}
             <button onClick={handleLogout} className="logout-btn">

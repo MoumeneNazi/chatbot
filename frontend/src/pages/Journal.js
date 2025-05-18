@@ -1,136 +1,227 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
+import '../styles/pages.css';
 import '../styles/journal.css';
 
-function Journal() {
-  const { role } = useAuth();
+const Journal = () => {
+  const navigate = useNavigate();
+  const { token, role } = useAuth();
   const [entries, setEntries] = useState([]);
-  const [treatmentProgress, setTreatmentProgress] = useState([]);
   const [newEntry, setNewEntry] = useState({
-    entry: '',
-    mood_rating: 5
+    title: '',
+    content: '',
+    mood: 'neutral',
+    activities: []
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isWriting, setIsWriting] = useState(false);
 
-  // Fetch journal entries and treatment progress
+  const moods = [
+    'happy', 'excited', 'peaceful', 'neutral', 
+    'anxious', 'sad', 'angry', 'stressed'
+  ];
+
+  const commonActivities = [
+    'Exercise', 'Reading', 'Meditation', 'Work',
+    'Social Activity', 'Therapy Session', 'Relaxation',
+    'Outdoor Activity', 'Creative Activity', 'Family Time'
+  ];
+
+  const getMoodFromRating = (rating) => {
+    // Convert 1-based rating back to mood string
+    return moods[rating - 1] || 'neutral';
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        // Fetch journal entries
-        const entriesResponse = await api.get('/journal/entries');
-        setEntries(entriesResponse.data);
+    if (role !== 'user') {
+      navigate('/login');
+      return;
+    }
+    fetchEntries();
+  }, [role, navigate]);
 
-        // Fetch treatment progress if user role
-        if (role === 'user') {
-          const progressResponse = await api.get('/my/treatment/progress');
-          setTreatmentProgress(progressResponse.data);
-        }
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load your journal data');
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [role]);
-
-  const handleEntrySubmit = async (e) => {
-    e.preventDefault();
-    if (!newEntry.entry.trim()) return;
-
+  const fetchEntries = async () => {
     try {
-      await api.post('/journal/entry', newEntry);
-      // Refresh entries after adding new one
-      const response = await api.get('/journal/entries');
-      setEntries(response.data);
-      setNewEntry({ entry: '', mood_rating: 5 });
+      setLoading(true);
+      const response = await api.get('/api/journal');
+      // Transform the entries to include mood string
+      const transformedEntries = response.data.map(entry => ({
+        ...entry,
+        mood: getMoodFromRating(entry.mood_rating)
+      }));
+      setEntries(transformedEntries);
+      setError(null);
     } catch (err) {
-      console.error('Error adding journal entry:', err);
-      setError('Failed to add journal entry');
+      console.error('Error fetching journal entries:', err);
+      setError('Failed to load journal entries');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (loading) return <div className="loading">Loading your journal...</div>;
-  if (error) return <div className="error">{error}</div>;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/api/journal', {
+        entry: newEntry.content,
+        mood_rating: moods.indexOf(newEntry.mood) + 1 // Convert mood to number rating
+      });
+      setNewEntry({
+        title: '',
+        content: '',
+        mood: 'neutral',
+        activities: []
+      });
+      setIsWriting(false);
+      fetchEntries();
+    } catch (err) {
+      console.error('Error creating journal entry:', err);
+      setError('Failed to save journal entry');
+    }
+  };
+
+  const toggleActivity = (activity) => {
+    setNewEntry(prev => ({
+      ...prev,
+      activities: prev.activities.includes(activity)
+        ? prev.activities.filter(a => a !== activity)
+        : [...prev.activities, activity]
+    }));
+  };
 
   return (
-    <div className="journal-page">
-      <div className="journal-section">
-        <h2>My Journal</h2>
-        
-        {/* New Entry Form */}
-        <form onSubmit={handleEntrySubmit} className="new-entry-form">
-          <div className="form-group">
-            <label htmlFor="entry">New Entry</label>
-            <textarea
-              id="entry"
-              value={newEntry.entry}
-              onChange={(e) => setNewEntry({ ...newEntry, entry: e.target.value })}
-              placeholder="Write your thoughts..."
-              rows={4}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="mood">Mood Rating (1-10)</label>
-            <input
-              type="range"
-              id="mood"
-              min="1"
-              max="10"
-              value={newEntry.mood_rating}
-              onChange={(e) => setNewEntry({ ...newEntry, mood_rating: parseInt(e.target.value) })}
-            />
-            <span>{newEntry.mood_rating}</span>
-          </div>
-          <button type="submit">Save Entry</button>
-        </form>
-
-        {/* Journal Entries List */}
-        <div className="entries-list">
-          {entries.map((entry) => (
-            <div key={entry.id} className="journal-entry">
-              <div className="entry-header">
-                <span className="timestamp">{new Date(entry.timestamp).toLocaleString()}</span>
-                <span className="mood-rating">Mood: {entry.mood_rating}/10</span>
-              </div>
-              <p className="entry-content">{entry.entry}</p>
-              {entry.sentiment_score !== null && (
-                <div className="sentiment-score">
-                  Sentiment: {entry.sentiment_score > 0 ? 'Positive' : entry.sentiment_score < 0 ? 'Negative' : 'Neutral'}
-                </div>
-              )}
-            </div>
-          ))}
+    <div className="page-container">
+      <div className="journal-container">
+        <div className="journal-header">
+          <h1>My Journal</h1>
+          <p className="subtitle">Express your thoughts and track your emotional journey</p>
+          {!isWriting && (
+            <button 
+              onClick={() => setIsWriting(true)}
+              className="new-entry-button"
+            >
+              Write New Entry
+            </button>
+          )}
         </div>
-      </div>
 
-      {/* Treatment Progress Section (for users only) */}
-      {role === 'user' && treatmentProgress.length > 0 && (
-        <div className="treatment-section">
-          <h2>Treatment Progress</h2>
-          <div className="progress-list">
-            {treatmentProgress.map((progress) => (
-              <div key={progress.id} className="progress-entry">
-                <div className="progress-header">
-                  <span className="timestamp">{new Date(progress.timestamp).toLocaleString()}</span>
-                  <span className="status">{progress.progress_status}</span>
+        {error && <div className="error-message">{error}</div>}
+
+        {isWriting && (
+          <form onSubmit={handleSubmit} className="journal-form">
+            <div className="form-group">
+              <label htmlFor="title">Title</label>
+              <input
+                type="text"
+                id="title"
+                value={newEntry.title}
+                onChange={(e) => setNewEntry(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Give your entry a title..."
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>How are you feeling?</label>
+              <div className="mood-selector">
+                {moods.map(mood => (
+                  <button
+                    key={mood}
+                    type="button"
+                    className={`mood-button ${newEntry.mood === mood ? 'active' : ''}`}
+                    onClick={() => setNewEntry(prev => ({ ...prev, mood }))}
+                  >
+                    {mood.charAt(0).toUpperCase() + mood.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Activities (Optional)</label>
+              <div className="activities-grid">
+                {commonActivities.map(activity => (
+                  <button
+                    key={activity}
+                    type="button"
+                    className={`activity-tag ${newEntry.activities.includes(activity) ? 'active' : ''}`}
+                    onClick={() => toggleActivity(activity)}
+                  >
+                    {activity}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="content">Your Thoughts</label>
+              <textarea
+                id="content"
+                value={newEntry.content}
+                onChange={(e) => setNewEntry(prev => ({ ...prev, content: e.target.value }))}
+                placeholder="Write about your day, thoughts, feelings..."
+                rows="8"
+                required
+              />
+            </div>
+
+            <div className="form-actions">
+              <button 
+                type="button" 
+                className="cancel-button"
+                onClick={() => setIsWriting(false)}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="save-button">
+                Save Entry
+              </button>
+            </div>
+          </form>
+        )}
+
+        {loading ? (
+          <div className="loading">Loading journal entries...</div>
+        ) : (
+          <div className="entries-list">
+            {entries.map(entry => (
+              <div key={entry.id} className="journal-entry">
+                <div className="entry-header">
+                  <h3>{entry.title}</h3>
+                  <span className="entry-date">
+                    {new Date(entry.timestamp).toLocaleDateString()}
+                  </span>
                 </div>
-                <h3>Treatment Plan</h3>
-                <p>{progress.treatment_plan}</p>
-                <h3>Notes</h3>
-                <p>{progress.notes}</p>
+                <div className="entry-mood">
+                  Mood: <span className={`mood-indicator ${entry.mood}`}>
+                    {entry.mood.charAt(0).toUpperCase() + entry.mood.slice(1)}
+                  </span>
+                </div>
+                {entry.activities && entry.activities.length > 0 && (
+                  <div className="entry-activities">
+                    {entry.activities.map(activity => (
+                      <span key={activity} className="activity-tag">
+                        {activity}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="entry-content">{entry.content}</p>
               </div>
             ))}
+            {entries.length === 0 && (
+              <div className="no-entries">
+                No journal entries yet. Start writing to track your journey!
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
-}
+};
 
 export default Journal;

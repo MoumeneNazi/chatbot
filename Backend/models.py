@@ -1,8 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text
 from sqlalchemy.ext.declarative import declarative_base
-from typing import Optional
+from typing import Optional, List
 
 Base = declarative_base()
 
@@ -14,6 +14,8 @@ class UserModel(Base):
     username = Column(String, unique=True, index=True)
     password = Column(String)
     role = Column(String, default="user")  # "user" or "therapist"
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime, nullable=True)
 
 class ChatMessageModel(Base):
     __tablename__ = "chat_messages"
@@ -42,7 +44,7 @@ class TreatmentProgressModel(Base):
     therapist_id = Column(Integer, ForeignKey("users.id"))
     notes = Column(Text)
     treatment_plan = Column(Text)
-    progress_status = Column(String)  # e.g., "Started", "In Progress", "Completed"
+    progress_status = Column(String)  # "Initial", "In Progress", "Completed"
     timestamp = Column(DateTime, default=datetime.utcnow)
 
 class ReviewModel(Base):
@@ -61,12 +63,17 @@ class ReviewModel(Base):
 class UserBase(BaseModel):
     username: str
 
+    class Config:
+        from_attributes = True
+
 class UserCreate(UserBase):
     password: str
 
 class User(UserBase):
     id: int
     role: str
+    created_at: datetime
+    last_login: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -75,9 +82,11 @@ class UserInDB(User):
     password: str
 
 class ChatMessage(BaseModel):
+    id: int
     content: str
     role: str
     timestamp: datetime
+    user_id: int
 
     class Config:
         from_attributes = True
@@ -85,22 +94,34 @@ class ChatMessage(BaseModel):
 class Journal(BaseModel):
     id: int
     entry: str
-    mood_rating: int
+    mood_rating: int = Field(..., ge=1, le=10)
     timestamp: datetime
     sentiment_score: Optional[float] = None
+    user_id: int
 
     class Config:
         from_attributes = True
+
+class JournalCreate(BaseModel):
+    entry: str
+    mood_rating: int = Field(..., ge=1, le=10)
 
 class TreatmentProgress(BaseModel):
     id: int
     notes: str
     treatment_plan: str
-    progress_status: str
+    progress_status: str = Field(..., pattern="^(Initial|In Progress|Completed)$")
     timestamp: datetime
+    user_id: int
+    therapist_id: int
 
     class Config:
         from_attributes = True
+
+class TreatmentProgressCreate(BaseModel):
+    notes: str
+    treatment_plan: str
+    progress_status: str = Field(..., pattern="^(Initial|In Progress|Completed)$")
 
 class Review(BaseModel):
     id: int
@@ -109,8 +130,14 @@ class Review(BaseModel):
     disorder: str
     specialty: Optional[str] = None
     timestamp: datetime
-    therapist_name: Optional[str] = None
     user_id: int
+    therapist_id: int
 
     class Config:
-        from_attributes = True 
+        from_attributes = True
+
+class ReviewCreate(BaseModel):
+    title: str
+    content: str
+    disorder: str
+    specialty: Optional[str] = None 

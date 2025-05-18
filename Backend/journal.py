@@ -1,144 +1,237 @@
-from fastapi import APIRouter, Depends, HTTPException
-from models import User, JournalModel, TreatmentProgressModel
-from dependencies import require_role
-from database import get_journal_by_username, get_db
+from fastapi import APIRouter, Depends, HTTPException, status
+from models import User
+from dependencies import check_user_role
 from sqlalchemy.orm import Session
 from datetime import datetime
 from textblob import TextBlob
 import logging
+from journal_models import (
+    JournalEntryModel, 
+    JournalEntryCreate, 
+    JournalEntry,
+    TreatmentProgressModel,
+    TreatmentProgressCreate,
+    TreatmentProgress
+)
+from journal_database import get_journal_db
+from database import get_db
+from contextlib import contextmanager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    prefix="/admin",  # Add prefix to match frontend expectations
-    tags=["admin"],
+    prefix="/api",
+    tags=["journal"],
     responses={404: {"description": "Not found"}}
 )
 
-@router.get("/journal/{username}")
-def get_journal(username: str, current_user: User = Depends(require_role("therapist")), db: Session = Depends(get_db)):
-    """Get a user's journal entries. Only accessible by therapists (admins)."""
-    logger.info(f"Admin {current_user.username} requesting journal for user {username}")
-    journal = get_journal_by_username(username, db)
-    if not journal:
-        raise HTTPException(status_code=404, detail="No journal found")
-    return journal
-
-@router.post("/journal/entry")
-def create_journal_entry(entry: str, mood_rating: int, current_user: User = Depends(require_role("user")), db: Session = Depends(get_db)):
-    """Create a new journal entry for the current user."""
+@contextmanager
+def managed_db_session(db: Session):
+    """Context manager for database sessions to ensure proper cleanup."""
     try:
-        # Calculate sentiment score
-        sentiment = TextBlob(entry).sentiment.polarity
-        
-        journal_entry = JournalModel(
-            user_id=current_user.id,
-            entry=entry,
-            mood_rating=mood_rating,
-            sentiment_score=sentiment
-        )
-        db.add(journal_entry)
+        yield db
         db.commit()
-        return {"message": "Journal entry created successfully"}
     except Exception as e:
-        logger.error(f"Error creating journal entry: {e}")
         db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to create journal entry")
+        raise e
+    finally:
+        db.close()
 
-@router.get("/journal/entries")
-def get_journal_entries(current_user: User = Depends(require_role("user")), db: Session = Depends(get_db)):
-    """Get all journal entries for the current user."""
+@router.get("/journal")
+async def get_journal_entries(
+    current_user: User = Depends(lambda user: check_user_role(user, "user")),
+    journal_db: Session = Depends(get_journal_db)
+):
+    """Get journal entries for the current user."""
     try:
-        entries = db.query(JournalModel).filter(
-            JournalModel.user_id == current_user.id
-        ).order_by(JournalModel.timestamp.desc()).all()
-        
-        return [
-            {
+        with managed_db_session(journal_db):
+            entries = journal_db.query(JournalEntryModel).filter(
+                JournalEntryModel.user_id == current_user.id
+            ).order_by(JournalEntryModel.timestamp.desc()).all()
+            
+            return [
+                {
+                    "id": entry.id,
+                    "entry": entry.entry,
+                    "mood_rating": entry.mood_rating,
+                    "sentiment": entry.sentiment,
+                    "timestamp": entry.timestamp.isoformat()
+                }
+                for entry in entries
+            ]
+    except Exception as e:
+        logger.error(f"Error fetching journal entries: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch journal entries: {str(e)}"
+        )
+
+@router.post("/journal")
+async def create_journal_entry(
+    entry_data: JournalEntryCreate,
+    current_user: User = Depends(lambda user: check_user_role(user, "user")),
+    journal_db: Session = Depends(get_journal_db)
+):
+    """Create a new journal entry."""
+    try:
+        with managed_db_session(journal_db):
+            # Calculate sentiment using TextBlob
+            sentiment = TextBlob(entry_data.entry).sentiment.polarity
+            
+            entry = JournalEntryModel(
+                user_id=current_user.id,
+                entry=entry_data.entry,
+                mood_rating=entry_data.mood_rating,
+                sentiment=sentiment,
+                timestamp=datetime.utcnow()
+            )
+            journal_db.add(entry)
+            journal_db.flush()
+            
+            return {
                 "id": entry.id,
                 "entry": entry.entry,
                 "mood_rating": entry.mood_rating,
-                "sentiment_score": entry.sentiment_score,
+                "sentiment": entry.sentiment,
                 "timestamp": entry.timestamp.isoformat()
             }
-            for entry in entries
-        ]
     except Exception as e:
-        logger.error(f"Error fetching journal entries: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch journal entries")
+        logger.error(f"Error creating journal entry: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create journal entry: {str(e)}"
+        )
 
-@router.post("/treatment/progress")
-def add_treatment_progress(
+@router.get("/journal/{user_id}")
+async def get_user_journal_entries(
     user_id: int,
-    notes: str,
-    treatment_plan: str,
-    progress_status: str,
-    current_user: User = Depends(require_role("therapist")),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(lambda user: check_user_role(user, "therapist")),
+    journal_db: Session = Depends(get_journal_db),
+    main_db: Session = Depends(get_db)
+):
+    """Get journal entries for a specific user (therapist only)."""
+    try:
+        with managed_db_session(journal_db):
+            # Verify user exists
+            user = main_db.query(User).filter(User.id == user_id).first()
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"User {user_id} not found"
+                )
+            
+            entries = journal_db.query(JournalEntryModel).filter(
+                JournalEntryModel.user_id == user_id
+            ).order_by(JournalEntryModel.timestamp.desc()).all()
+            
+            return [
+                {
+                    "id": entry.id,
+                    "entry": entry.entry,
+                    "mood_rating": entry.mood_rating,
+                    "sentiment": entry.sentiment,
+                    "timestamp": entry.timestamp.isoformat()
+                }
+                for entry in entries
+            ]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching user journal entries: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch journal entries: {str(e)}"
+        )
+
+@router.post("/treatment/progress", response_model=TreatmentProgress)
+async def add_treatment_progress(
+    progress_data: TreatmentProgressCreate,
+    user_id: int,
+    current_user: User = Depends(lambda user: check_user_role(user, "therapist")),
+    journal_db: Session = Depends(get_journal_db),
+    main_db: Session = Depends(get_db)
 ):
     """Add treatment progress for a user (therapist only)."""
     try:
-        progress = TreatmentProgressModel(
-            user_id=user_id,
-            therapist_id=current_user.id,
-            notes=notes,
-            treatment_plan=treatment_plan,
-            progress_status=progress_status
-        )
-        db.add(progress)
-        db.commit()
-        return {"message": "Treatment progress added successfully"}
+        with managed_db_session(journal_db):
+            # Verify user exists
+            user = main_db.query(User).filter(User.id == user_id).first()
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"User {user_id} not found"
+                )
+            
+            progress = TreatmentProgressModel(
+                user_id=user_id,
+                therapist_id=current_user.id,
+                notes=progress_data.notes,
+                treatment_plan=progress_data.treatment_plan,
+                progress_status=progress_data.progress_status
+            )
+            journal_db.add(progress)
+            journal_db.flush()
+            
+            return progress
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error adding treatment progress: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to add treatment progress")
+        logger.error(f"Error adding treatment progress: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add treatment progress: {str(e)}"
+        )
 
-@router.get("/treatment/progress/{user_id}")
-def get_treatment_progress(
+@router.get("/treatment/progress/{user_id}", response_model=list[TreatmentProgress])
+async def get_treatment_progress(
     user_id: int,
-    current_user: User = Depends(require_role("therapist")),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(lambda user: check_user_role(user, "therapist")),
+    journal_db: Session = Depends(get_journal_db),
+    main_db: Session = Depends(get_db)
 ):
     """Get treatment progress for a user (therapist only)."""
     try:
-        progress = db.query(TreatmentProgressModel).filter(
-            TreatmentProgressModel.user_id == user_id
-        ).order_by(TreatmentProgressModel.timestamp.desc()).all()
-        
-        return [
-            {
-                "id": p.id,
-                "notes": p.notes,
-                "treatment_plan": p.treatment_plan,
-                "progress_status": p.progress_status,
-                "timestamp": p.timestamp.isoformat()
-            }
-            for p in progress
-        ]
+        with managed_db_session(journal_db):
+            # Verify user exists
+            user = main_db.query(User).filter(User.id == user_id).first()
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"User {user_id} not found"
+                )
+            
+            progress = journal_db.query(TreatmentProgressModel).filter(
+                TreatmentProgressModel.user_id == user_id
+            ).order_by(TreatmentProgressModel.timestamp.desc()).all()
+            
+            return progress
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error fetching treatment progress: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch treatment progress")
+        logger.error(f"Error fetching treatment progress: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch treatment progress: {str(e)}"
+        )
 
-@router.get("/my/treatment/progress")
-def get_my_treatment_progress(current_user: User = Depends(require_role("user")), db: Session = Depends(get_db)):
+@router.get("/my/treatment/progress", response_model=list[TreatmentProgress])
+async def get_my_treatment_progress(
+    current_user: User = Depends(lambda user: check_user_role(user, "user")), 
+    journal_db: Session = Depends(get_journal_db)
+):
     """Get treatment progress for the current user."""
     try:
-        progress = db.query(TreatmentProgressModel).filter(
-            TreatmentProgressModel.user_id == current_user.id
-        ).order_by(TreatmentProgressModel.timestamp.desc()).all()
-        
-        return [
-            {
-                "id": p.id,
-                "notes": p.notes,
-                "treatment_plan": p.treatment_plan,
-                "progress_status": p.progress_status,
-                "timestamp": p.timestamp.isoformat()
-            }
-            for p in progress
-        ]
+        with managed_db_session(journal_db):
+            progress = journal_db.query(TreatmentProgressModel).filter(
+                TreatmentProgressModel.user_id == current_user.id
+            ).order_by(TreatmentProgressModel.timestamp.desc()).all()
+            
+            return progress
     except Exception as e:
-        logger.error(f"Error fetching treatment progress: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch treatment progress")
+        logger.error(f"Error fetching treatment progress: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch treatment progress: {str(e)}"
+        )

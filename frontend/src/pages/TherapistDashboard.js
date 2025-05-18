@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../api';
 import '../styles/admin.css';
 import '../styles/pages.css';
+import { useAuth } from '../context/AuthContext';
 
 function TherapistDashboard() {
   const [users, setUsers] = useState([]);
   const [error, setError] = useState('');
-  const token = localStorage.getItem('token');
-  const role = localStorage.getItem('role');
+  const { token, role } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Logic fix: Only allow therapist role
+    // Only allow therapist role
     if (!token || role !== "therapist") {
       navigate("/login");
       return;
@@ -19,17 +20,19 @@ function TherapistDashboard() {
 
     const fetchUsers = async () => {
       try {
-        const res = await fetch('http://localhost:8000/admin/users', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const data = await res.json();
-        if (res.ok) {
-          setUsers(data);
+        const response = await api.get('/api/therapist/users');
+        if (response.data) {
+          setUsers(response.data);
+          setError(null);
         } else {
-          setError(data.detail || 'Access denied');
+          setError('No users found');
         }
-      } catch {
-        setError('Server error');
+      } catch (err) {
+        console.error('Error fetching users:', err);
+        setError(err.response?.data?.detail || 'Failed to fetch users. Please try again later.');
+        if (err.response?.status === 401) {
+          navigate('/login');
+        }
       }
     };
     fetchUsers();
@@ -37,15 +40,9 @@ function TherapistDashboard() {
 
   const promoteUser = async (username) => {
     try {
-      const res = await fetch(`http://localhost:8000/admin/promote/${username}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert(data.msg);
+      const response = await api.put(`/api/therapist/promote/${username}`);
+      if (response.data) {
+        alert(response.data.msg);
         // Refresh user list
         setUsers(prev =>
           prev.map(u =>
@@ -53,14 +50,18 @@ function TherapistDashboard() {
           )
         );
       } else {
-        alert(data.detail || 'Failed to promote');
+        alert('Failed to promote user');
       }
-    } catch {
-      alert('Server error');
+    } catch (err) {
+      console.error('Error promoting user:', err);
+      alert(err.response?.data?.detail || 'Server error');
+      if (err.response?.status === 401) {
+        navigate('/login');
+      }
     }
   };
 
-  const viewJournal = (username) => navigate(`/therapist?username=${username}`);
+  const viewJournal = (username) => navigate(`/therapist/journal/${username}`);
   const viewChat = (username) => navigate(`/therapist/chat/${username}`);
 
   return (

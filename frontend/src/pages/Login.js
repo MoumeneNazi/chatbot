@@ -38,8 +38,8 @@ function Login() {
 
       const data = response.data;
       
-      // Store session info
-      await login(data.access_token, data.role);
+      // Store session info with username
+      await login(data.access_token, data.role, data.username);
       
       // Redirect based on role
       if (data.role === 'therapist') {
@@ -60,36 +60,39 @@ function Login() {
   };
 
   return (
-    <div className="auth-page">
-      <h2>Login</h2>
-      <form onSubmit={handleSubmit}>
-        <input
-          name="username"
-          placeholder="Username"
-          value={form.username}
-          onChange={handleChange}
-          required
-          autoComplete="username"
-        />
-        <input
-          name="password"
-          type="password"
-          placeholder="Password"
-          value={form.password}
-          onChange={handleChange}
-          required
-          autoComplete="current-password"
-        />
-        <button type="submit">Login</button>
-        {error && (
-          <p className="error">
-            {typeof error === 'string' ? error : JSON.stringify(error)}
-          </p>
-        )}
-      </form>
-      <p>
-        Don't have an account? <Link to="/register">Register</Link>
-      </p>
+    <div className="auth-container">
+      <div className="auth-box">
+        <h2>Login</h2>
+        {error && <div className="error-message">{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="username">Username</label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              value={form.username}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              value={form.password}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          <button type="submit" className="auth-button">Login</button>
+        </form>
+        <p className="auth-link">
+          Don't have an account? <Link to="/register">Register</Link>
+        </p>
+      </div>
     </div>
   );
 }

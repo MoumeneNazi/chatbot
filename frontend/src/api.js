@@ -1,7 +1,8 @@
 import axios from "axios";
 
+// Create axios instance with base URL
 const api = axios.create({
-  baseURL: "http://localhost:8000", // FastAPI server URL
+  baseURL: process.env.REACT_APP_API_URL || "http://localhost:8000", // FastAPI server URL
   headers: {
     'Content-Type': 'application/json'
   }
@@ -25,10 +26,9 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // If error is 401, redirect to login
     if (error.response?.status === 401) {
-      // Handle unauthorized access
-      localStorage.removeItem("token");
-      localStorage.removeItem("role");
+      localStorage.clear();
       window.location.href = "/login";
     }
     return Promise.reject(error);

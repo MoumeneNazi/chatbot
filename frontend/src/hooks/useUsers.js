@@ -10,7 +10,7 @@ export function useUsers() {
     setLoading(true);
     setError("");
     try {
-      const res = await api.get("/admin/users");
+      const res = await api.get("/api/admin/users");
       setUsers(res.data);
     } catch (e) {
       setError("Failed to fetch users");

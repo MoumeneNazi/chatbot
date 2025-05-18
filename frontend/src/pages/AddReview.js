@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import api from '../api';
 import '../styles/pages.css';
 import '../styles/review.css';
 
@@ -13,15 +13,39 @@ const AddReview = () => {
   const [formData, setFormData] = useState({
     title: '',
     content: '',
-    disorder: 'Anxiety',
+    disorder: '',
     specialty: '',
-    userId: location.state?.userId || '', // Get userId from location state if available
-    username: location.state?.username || '', // Get username from location state if available
+    userId: location.state?.userId || '',
+    username: location.state?.username || '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [disorderSearchTerm, setDisorderSearchTerm] = useState('');
+  const [showDisorderResults, setShowDisorderResults] = useState(false);
+
+  const disorders = [
+    'Adjustment Disorder',
+    'Anxiety',
+    'Attention-Deficit/Hyperactivity Disorder (ADHD)',
+    'Autism Spectrum Disorder',
+    'Bipolar Disorder',
+    'Borderline Personality Disorder',
+    'Depression',
+    'Dissociative Identity Disorder',
+    'Eating Disorders',
+    'Generalized Anxiety Disorder',
+    'Major Depressive Disorder',
+    'Obsessive-Compulsive Disorder',
+    'Panic Disorder',
+    'Post-Traumatic Stress Disorder',
+    'Schizophrenia',
+    'Social Anxiety Disorder',
+    'Specific Phobias'
+  ];
+
+  const filteredDisorders = disorders.filter(disorder =>
+    disorder.toLowerCase().includes(disorderSearchTerm.toLowerCase())
+  );
 
   useEffect(() => {
     // Verify therapist authentication
@@ -30,68 +54,53 @@ const AddReview = () => {
       return;
     }
 
-    // Fetch users if no specific user is selected
-    if (!formData.userId) {
-      fetchUsers();
-    }
-  }, [navigate, token, formData.userId]);
+    // Fetch users
+    fetchUsers();
+  }, [navigate, token]);
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('/api/admin/users', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/api/users');
       const filteredUsers = response.data.filter(user => user.role === 'user');
       setUsers(filteredUsers);
       setError(null);
     } catch (err) {
       console.error('Error fetching users:', err);
-      setError('Failed to fetch users. Please try again later.');
+      // Extract error message safely
+      const errorMessage = err.response?.data?.detail;
+      if (Array.isArray(errorMessage)) {
+        // Handle FastAPI validation errors
+        setError(errorMessage.map(err => err.msg).join(', '));
+      } else {
+        setError(errorMessage || err.message || 'Failed to fetch users. Please try again later.');
+      }
     }
   };
-
-  useEffect(() => {
-    if (searchTerm.trim()) {
-      setFilteredUsers(
-        users.filter(user => 
-          user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.name?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      );
-    } else {
-      setFilteredUsers([]);
-    }
-  }, [searchTerm, users]);
-
-  const disorders = [
-    'Anxiety',
-    'Depression',
-    'Generalized Anxiety Disorder',
-    'Major Depressive Disorder',
-    'Panic Disorder',
-    'Bipolar Disorder',
-    'Post-Traumatic Stress Disorder',
-    'Obsessive-Compulsive Disorder',
-    'Attention-Deficit/Hyperactivity Disorder (ADHD)',
-    'Autism Spectrum Disorder'
-  ];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    if (name === 'userId') {
+      const selectedUser = users.find(u => u.id === parseInt(value));
+      setFormData(prev => ({
+        ...prev,
+        userId: value,
+        username: selectedUser ? selectedUser.username : ''
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
-  const selectUser = (user) => {
+  const selectDisorder = (disorder) => {
     setFormData(prev => ({
       ...prev,
-      userId: user.id,
-      username: user.username
+      disorder
     }));
-    setSearchTerm('');
-    setFilteredUsers([]);
+    setDisorderSearchTerm('');
+    setShowDisorderResults(false);
   };
 
   const handleSubmit = async (e) => {
@@ -100,23 +109,33 @@ const AddReview = () => {
       setError('Please select a user to review');
       return;
     }
+    if (!formData.disorder) {
+      setError('Please select a disorder');
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      await axios.post('/api/reviews', {
+      await api.post('/api/reviews', {
         title: formData.title,
         content: formData.content,
         disorder: formData.disorder,
         specialty: formData.specialty,
-        user_id: formData.userId
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
+        user_id: parseInt(formData.userId)
       });
-      navigate(`/reviews?userId=${formData.userId}`);
+      navigate(`/review?userId=${formData.userId}`);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to publish review');
+      console.error('Error creating review:', err);
+      // Handle error message properly
+      const errorMessage = err.response?.data?.detail;
+      if (Array.isArray(errorMessage)) {
+        // Handle FastAPI validation errors
+        setError(errorMessage.map(err => err.msg).join(', '));
+      } else {
+        setError(errorMessage || err.message || 'Failed to publish review');
+      }
     } finally {
       setLoading(false);
     }
@@ -131,44 +150,24 @@ const AddReview = () => {
         {error && <div className="error-message">{error}</div>}
 
         <form onSubmit={handleSubmit} className="review-form">
-          {!formData.userId ? (
-            <div className="form-group user-search-group">
-              <label htmlFor="userSearch">Search User</label>
-              <input
-                type="text"
-                id="userSearch"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by username..."
-                className="search-input"
-              />
-              {filteredUsers.length > 0 && (
-                <div className="user-search-results">
-                  {filteredUsers.map(user => (
-                    <div
-                      key={user.id}
-                      className="user-search-item"
-                      onClick={() => selectUser(user)}
-                    >
-                      <span className="username">{user.username}</span>
-                      {user.name && <span className="name">{user.name}</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="selected-user">
-              <h3>Review for: {formData.username}</h3>
-              <button
-                type="button"
-                className="change-user-btn"
-                onClick={() => setFormData(prev => ({ ...prev, userId: '', username: '' }))}
-              >
-                Change User
-              </button>
-            </div>
-          )}
+          <div className="form-group">
+            <label htmlFor="userId">Select User</label>
+            <select
+              id="userId"
+              name="userId"
+              value={formData.userId}
+              onChange={handleChange}
+              required
+              className="user-select"
+            >
+              <option value="">Select a user...</option>
+              {users.map(user => (
+                <option key={user.id} value={user.id}>
+                  {user.username}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div className="form-group">
             <label htmlFor="title">Title</label>
@@ -185,17 +184,41 @@ const AddReview = () => {
 
           <div className="form-group">
             <label htmlFor="disorder">Disorder</label>
-            <select
-              id="disorder"
-              name="disorder"
-              value={formData.disorder}
-              onChange={handleChange}
-              required
-            >
-              {disorders.map(disorder => (
-                <option key={disorder} value={disorder}>{disorder}</option>
-              ))}
-            </select>
+            <div className="disorder-search">
+              <input
+                type="text"
+                id="disorder-search"
+                value={disorderSearchTerm}
+                onChange={(e) => {
+                  setDisorderSearchTerm(e.target.value);
+                  setShowDisorderResults(true);
+                }}
+                onFocus={() => setShowDisorderResults(true)}
+                placeholder="Search for a disorder..."
+                className="search-input"
+              />
+              {formData.disorder && (
+                <div className="selected-disorder">
+                  Selected: {formData.disorder}
+                </div>
+              )}
+              {showDisorderResults && disorderSearchTerm && (
+                <div className="search-results">
+                  {filteredDisorders.map(disorder => (
+                    <div
+                      key={disorder}
+                      className="search-item"
+                      onClick={() => selectDisorder(disorder)}
+                    >
+                      {disorder}
+                    </div>
+                  ))}
+                  {filteredDisorders.length === 0 && (
+                    <div className="no-results">No matching disorders found</div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="form-group">
@@ -235,7 +258,7 @@ const AddReview = () => {
             <button 
               type="submit" 
               className="primary-button"
-              disabled={loading || !formData.userId}
+              disabled={loading || !formData.userId || !formData.disorder}
             >
               {loading ? 'Publishing...' : 'Publish Review'}
             </button>
