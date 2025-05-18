@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from dependencies import get_current_user, check_user_role
 from database import get_db
 from sqlalchemy.orm import Session
-from models import ChatMessageModel, User
+from models import ChatMessageModel, User, UserModel
 import logging
 import re
 
@@ -55,13 +55,14 @@ except Exception as e:
 class ChatMessage(BaseModel):
     message: str
 
-@router.post("/chat")
+@router.post("/chatbot")
 async def send_message(
-    message: str,
+    message_data: ChatMessage,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
+        message = message_data.message
         # Create user message
         user_message = ChatMessageModel(
             user_id=current_user.id,
@@ -113,12 +114,20 @@ async def get_chat_history(current_user: User = Depends(get_current_user), db: S
 @router.get("/chat/history/{user_id}")
 async def get_user_chat_history(
     user_id: int,
-    current_user: User = Depends(lambda user: check_user_role(user, "therapist")),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """Get chat history for a specific user (therapist only)."""
     try:
+        # Check if user is a therapist
+        if current_user.role != "therapist":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Operation not permitted. Required role: therapist"
+            )
+            
         # Verify user exists
-        user = db.query(User).filter(User.id == user_id).first()
+        user = db.query(UserModel).filter(UserModel.id == user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
@@ -145,22 +154,40 @@ def ask_groq(message: str) -> str:
             messages=[
                 {
                     "role": "system", 
-                    "content": "You are a mental health support system. Respond with specific, actionable guidance. Reference the user's exact words. Never use think blocks or meta-commentary."
+                    "content": "You are a warm, compassionate friend providing emotional support. NEVER start your response with '<think>' or similar tags. NEVER include your thought process. Just respond directly as if you're texting a friend who needs support."
                 },
                 {"role": "user", "content": message}
             ],
-            max_tokens=200,
-            temperature=0.7
+            max_tokens=250,
+            temperature=0.8
         )
         
         content = response.choices[0].message.content.strip()
-        content = re.sub(r'<[^>]+>.*?</[^>]+>|\[.*?\]|\(.*?\)|thinking:|let me|I should|as an AI|as a chatbot', '', content, flags=re.DOTALL | re.IGNORECASE)
-        content = re.sub(r'\s+', ' ', content).strip()
         
-        return content if content else "Could you tell me more about what's troubling you?"
+        # Check for and remove <think> blocks specifically
+        if "<think>" in content.lower():
+            # If the response has a </think> tag, extract only what comes after it
+            think_end_match = re.search(r'</think>\s*', content, re.IGNORECASE)
+            if think_end_match:
+                content = content[think_end_match.end():].strip()
+            else:
+                # If no end tag, just remove the <think> tag and continue
+                content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL | re.IGNORECASE)
+                
+        # Also check for standalone <think> tag without proper closure
+        content = re.sub(r'^<think>.*?\n', '', content, flags=re.IGNORECASE)
+        
+        # Remove any remaining tags if they exist
+        content = re.sub(r'<[^>]+>.*?</[^>]+>', '', content, flags=re.DOTALL | re.IGNORECASE)
+        
+        # Handle case where entire response might have been in think tags
+        if not content.strip():
+            return "I'm here for you. How can I support you today?"
+        
+        return content
     except Exception as e:
         logger.error(f"[Groq API Error]: {str(e)}")
-        return "I'm here to listen. What's on your mind?"
+        return "I'm here for you. What's going on?"
 
 class MentalHealthChatbot:
     def __init__(self, uri, user, password, memory_file="session_memory.json"):

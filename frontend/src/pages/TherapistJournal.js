@@ -60,6 +60,7 @@ const TherapistJournal = () => {
   const fetchUsers = async () => {
     try {
       const response = await api.get('/api/users');
+      console.log('API Response - User objects:', response.data);
       const filteredUsers = response.data.filter(user => user.role === 'user');
       setUsers(filteredUsers);
     } catch (err) {
@@ -69,11 +70,24 @@ const TherapistJournal = () => {
   };
 
   const fetchJournalEntries = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser) {
+      setError('Please select a user first');
+      return;
+    }
     
+    console.log('Attempting to fetch journal entries for user:', selectedUser);
     setLoading(true);
     try {
-      let url = `/api/journal/${selectedUser.id}`;
+      // Ensure user ID is a valid integer
+      const userId = parseInt(selectedUser.id, 10);
+      console.log('Parsed user ID:', userId, 'Original ID:', selectedUser.id, 'Type:', typeof selectedUser.id);
+      if (isNaN(userId)) {
+        setError('Invalid user ID: Please select a valid user');
+        setLoading(false);
+        return;
+      }
+      
+      let url = `/api/journal/${userId}`;
       const params = new URLSearchParams();
       
       if (moodFilter !== 'all') {
@@ -91,13 +105,16 @@ const TherapistJournal = () => {
       setError(null);
     } catch (err) {
       console.error('Error fetching journal entries:', err);
-      setError('Failed to fetch journal entries');
+      setError(typeof err.response?.data?.detail === 'object'
+        ? JSON.stringify(err.response?.data?.detail)
+        : (err.response?.data?.detail || 'Failed to fetch journal entries'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleUserSelect = (user) => {
+    console.log('Selected user object:', user);
     setSelectedUser(user);
     setUserSearchTerm('');
     setFilteredUsers([]);
@@ -123,11 +140,17 @@ const TherapistJournal = () => {
     if (!entries.length) return null;
 
     const activityCounts = entries.reduce((acc, entry) => {
-      entry.activities.forEach(activity => {
-        acc[activity] = (acc[activity] || 0) + 1;
-      });
+      if (entry.activities && Array.isArray(entry.activities)) {
+        entry.activities.forEach(activity => {
+          acc[activity] = (acc[activity] || 0) + 1;
+        });
+      }
       return acc;
     }, {});
+
+    if (Object.keys(activityCounts).length === 0) {
+      return [];
+    }
 
     return Object.entries(activityCounts)
       .map(([activity, count]) => ({ activity, count }))
@@ -237,17 +260,19 @@ const TherapistJournal = () => {
                     </div>
                   </div>
 
-                  <div className="stats-section">
-                    <h3>Common Activities</h3>
-                    <div className="activity-stats">
-                      {getActivityStats()?.map(stat => (
-                        <div key={stat.activity} className="activity-stat">
-                          <span className="activity-name">{stat.activity}</span>
-                          <span className="stat-count">{stat.count} times</span>
-                        </div>
-                      ))}
+                  {getActivityStats()?.length > 0 && (
+                    <div className="stats-section">
+                      <h3>Common Activities</h3>
+                      <div className="activity-stats">
+                        {getActivityStats()?.map(stat => (
+                          <div key={stat.activity} className="activity-stat">
+                            <span className="activity-name">{stat.activity}</span>
+                            <span className="stat-count">{stat.count} times</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="entries-list">
@@ -264,7 +289,7 @@ const TherapistJournal = () => {
                           {entry.mood.charAt(0).toUpperCase() + entry.mood.slice(1)}
                         </span>
                       </div>
-                      {entry.activities && entry.activities.length > 0 && (
+                      {entry.activities && Array.isArray(entry.activities) && entry.activities.length > 0 && (
                         <div className="entry-activities">
                           {entry.activities.map(activity => (
                             <span key={activity} className="activity-tag">

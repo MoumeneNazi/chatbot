@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
 from dependencies import get_current_user
-from models import User, ChatMessage
+from models import User, UserModel, ChatMessage, ChatMessageModel
 from typing import List
 import logging
+from chatbot import ask_groq  # Import the AI function
+from datetime import datetime
 
 router = APIRouter(
     prefix="/api",
@@ -17,9 +19,9 @@ async def get_chat_history(
     db: Session = Depends(get_db)
 ):
     """Get chat history for the current user"""
-    messages = db.query(ChatMessage).filter(
-        ChatMessage.user_id == current_user.id
-    ).order_by(ChatMessage.timestamp).all()
+    messages = db.query(ChatMessageModel).filter(
+        ChatMessageModel.user_id == current_user.id
+    ).order_by(ChatMessageModel.timestamp).all()
     
     return [
         {
@@ -41,13 +43,13 @@ async def get_user_chat_history(
         raise HTTPException(status_code=403, detail="Access denied")
     
     # Verify user exists
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    messages = db.query(ChatMessage).filter(
-        ChatMessage.user_id == user_id
-    ).order_by(ChatMessage.timestamp).all()
+    messages = db.query(ChatMessageModel).filter(
+        ChatMessageModel.user_id == user_id
+    ).order_by(ChatMessageModel.timestamp).all()
     
     return [
         {
@@ -66,31 +68,47 @@ async def send_message(
 ):
     """Send a message as the current user"""
     try:
+        if "message" not in message:
+            raise HTTPException(status_code=422, detail="Message field is required")
+            
+        user_input = message["message"]
+        if not user_input or not isinstance(user_input, str):
+            raise HTTPException(status_code=422, detail="Message must be a non-empty string")
+            
         # Save user message
-        user_message = ChatMessage(
+        user_message = ChatMessageModel(
             user_id=current_user.id,
-            content=message["message"],
-            role="user"
+            content=user_input,
+            role="user",
+            timestamp=datetime.utcnow()
         )
         db.add(user_message)
         db.commit()
         
-        # Get AI response
-        response = "This is a test response"  # Replace with actual AI logic
+        # Get AI response using the chatbot's AI function
+        response = ask_groq(user_input)
         
         # Save AI response
-        ai_message = ChatMessage(
+        ai_message = ChatMessageModel(
             user_id=current_user.id,
             content=response,
-            role="assistant"
+            role="assistant",
+            timestamp=datetime.utcnow()
         )
         db.add(ai_message)
         db.commit()
         
         return {"response": response}
+    except HTTPException:
+        db.rollback()
+        raise
+    except KeyError:
+        db.rollback()
+        raise HTTPException(status_code=422, detail="Message field is required")
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logging.error(f"Error in chat endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process message: {str(e)}")
 
 @router.post("/chat/{user_id}")
 async def send_message_as_therapist(
@@ -104,33 +122,49 @@ async def send_message_as_therapist(
         raise HTTPException(status_code=403, detail="Access denied")
     
     # Verify user exists
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
     try:
+        if "message" not in message:
+            raise HTTPException(status_code=422, detail="Message field is required")
+            
+        user_input = message["message"]
+        if not user_input or not isinstance(user_input, str):
+            raise HTTPException(status_code=422, detail="Message must be a non-empty string")
+            
         # Save therapist message
-        therapist_message = ChatMessage(
+        therapist_message = ChatMessageModel(
             user_id=user_id,
-            content=message["message"],
-            role="user"  # Using "user" role for consistency
+            content=user_input,
+            role="user",  # Using "user" role for consistency
+            timestamp=datetime.utcnow()
         )
         db.add(therapist_message)
         db.commit()
         
-        # Get AI response
-        response = "This is a test response"  # Replace with actual AI logic
+        # Get AI response using the chatbot's AI function
+        response = ask_groq(user_input)
         
         # Save AI response
-        ai_message = ChatMessage(
+        ai_message = ChatMessageModel(
             user_id=user_id,
             content=response,
-            role="assistant"
+            role="assistant",
+            timestamp=datetime.utcnow()
         )
         db.add(ai_message)
         db.commit()
         
         return {"response": response}
+    except HTTPException:
+        db.rollback()
+        raise
+    except KeyError:
+        db.rollback()
+        raise HTTPException(status_code=422, detail="Message field is required")
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e)) 
+        logging.error(f"Error in therapist chat endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process message: {str(e)}") 

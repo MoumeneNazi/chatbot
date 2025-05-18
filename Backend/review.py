@@ -1,14 +1,47 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Form, Body
 from sqlalchemy.orm import Session
-from models import User, ReviewModel, Review
+from pydantic import BaseModel, Field
+from models import User, ReviewModel, Review, UserModel
 from database import get_db
-from dependencies import check_user_role
-from typing import List
+from dependencies import check_user_role, get_current_user
+from typing import List, Optional
 import logging
+from neo4j import GraphDatabase
+import os
+from dotenv import load_dotenv
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Load environment variables
+env_path = os.path.join(os.path.dirname(__file__), '.env')
+load_dotenv(dotenv_path=env_path)
+
+# Neo4j connection details
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "mimo2021")
+
+# Pydantic model for review creation
+class ReviewCreate(BaseModel):
+    title: str
+    content: str
+    disorder: str
+    specialty: str
+    user_id: int = Field(..., alias="user_id")
+    
+    class Config:
+        populate_by_name = True
+        json_schema_extra = {
+            "example": {
+                "title": "Assessment of Major Depressive Disorder",
+                "content": "Patient exhibits symptoms consistent with Major Depressive Disorder...",
+                "disorder": "Major Depressive Disorder",
+                "specialty": "Clinical Psychology",
+                "user_id": 1
+            }
+        }
 
 router = APIRouter(
     prefix="/api",  # Add prefix to match frontend expectations
@@ -20,7 +53,7 @@ router = APIRouter(
 def get_reviews(
     disorder: str = None,
     user_id: int = None,
-    current_user: User = Depends(lambda user: check_user_role(user, ["user", "therapist"])),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get reviews with optional filters."""
@@ -41,7 +74,7 @@ def get_reviews(
         # Add therapist names to reviews
         result = []
         for review in reviews:
-            therapist = db.query(User).filter(User.id == review.therapist_id).first()
+            therapist = db.query(UserModel).filter(UserModel.id == review.therapist_id).first()
             review_dict = Review.model_validate(review).model_dump()
             review_dict["therapist_name"] = therapist.username if therapist else None
             result.append(review_dict)
@@ -52,22 +85,44 @@ def get_reviews(
         raise HTTPException(status_code=500, detail="Failed to fetch reviews")
 
 @router.post("/reviews")
-def create_review(
-    title: str,
-    content: str,
-    disorder: str,
-    specialty: str,
-    user_id: int,
-    current_user: User = Depends(lambda user: check_user_role(user, "therapist")),
+async def create_review(
+    review_data: dict = Body(...),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a new review. Only accessible by therapists."""
     try:
+        # Check if user is a therapist
+        if current_user.role != "therapist":
+            raise HTTPException(
+                status_code=403,
+                detail="Access forbidden. Only therapists can create reviews."
+            )
+        
+        # Print the received data for debugging
+        logger.info(f"Received review data: {review_data}")
+        
+        # Extract fields directly from the request body
+        if not all(k in review_data for k in ["title", "content", "disorder", "specialty", "user_id"]):
+            raise HTTPException(
+                status_code=422,
+                detail="Missing required fields. Please provide title, content, disorder, specialty, and user_id"
+            )
+            
+        # Extract data
+        title = review_data["title"]
+        content = review_data["content"]
+        disorder = review_data["disorder"]
+        specialty = review_data["specialty"]
+        user_id = review_data["user_id"]
+            
         # Verify user exists
-        user = db.query(User).filter(User.id == user_id).first()
+        user = db.query(UserModel).filter(UserModel.id == user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
             
+        logger.info(f"Creating review for user {user_id} with title: {title}, disorder: {disorder}")
+        
         review = ReviewModel(
             title=title,
             content=content,
@@ -85,95 +140,87 @@ def create_review(
     except Exception as e:
         logger.error(f"Error creating review: {e}")
         db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to create review")
+        raise HTTPException(status_code=500, detail=f"Failed to create review: {str(e)}")
 
 @router.get("/users")
-def get_users(current_user: User = Depends(lambda user: check_user_role(user, "therapist")), db: Session = Depends(get_db)):
+def get_users(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get all users. Only accessible by therapists."""
     try:
-        users = db.query(User).filter(User.role == "user").all()
+        # Check if user is a therapist
+        if current_user.role != "therapist":
+            raise HTTPException(status_code=403, detail="Access forbidden. Only therapists can view all users.")
+        
+        # Query the UserModel instead of User (which is a Pydantic model)
+        users = db.query(UserModel).filter(UserModel.role == "user").all()
         return [{"id": u.id, "username": u.username, "role": u.role} for u in users]
+    except HTTPException as he:
+        raise he
     except Exception as e:
         logger.error(f"Error fetching users: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch users")
 
+def get_neo4j_connection():
+    """Create and return a Neo4j driver instance."""
+    try:
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        # Test connection
+        with driver.session() as session:
+            session.run("RETURN 1")
+        return driver
+    except Exception as e:
+        logger.error(f"Failed to connect to Neo4j: {str(e)}")
+        return None
+
 @router.get("/symptoms")
 def get_symptoms(
     disorder: str = None,
-    current_user: User = Depends(lambda user: check_user_role(user, ["user", "therapist"])),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get symptoms with optional disorder filter."""
     try:
-        # Define common symptoms for each disorder
-        symptoms_map = {
-            "Anxiety": [
-                {"name": "Excessive worry"},
-                {"name": "Restlessness"},
-                {"name": "Difficulty concentrating"},
-                {"name": "Sleep problems"},
-                {"name": "Muscle tension"}
-            ],
-            "Depression": [
-                {"name": "Persistent sadness"},
-                {"name": "Loss of interest"},
-                {"name": "Changes in appetite"},
-                {"name": "Sleep disturbances"},
-                {"name": "Fatigue"}
-            ],
-            "Generalized Anxiety Disorder": [
-                {"name": "Chronic worry"},
-                {"name": "Difficulty controlling worry"},
-                {"name": "Physical tension"},
-                {"name": "Sleep disturbances"},
-                {"name": "Irritability"}
-            ],
-            "Major Depressive Disorder": [
-                {"name": "Severe depression"},
-                {"name": "Hopelessness"},
-                {"name": "Loss of pleasure"},
-                {"name": "Weight changes"},
-                {"name": "Suicidal thoughts"}
-            ],
-            "Panic Disorder": [
-                {"name": "Panic attacks"},
-                {"name": "Fear of panic attacks"},
-                {"name": "Avoidance behavior"},
-                {"name": "Heart palpitations"},
-                {"name": "Sweating"}
-            ],
-            "Bipolar Disorder": [
-                {"name": "Mood swings"},
-                {"name": "Manic episodes"},
-                {"name": "Depressive episodes"},
-                {"name": "Changes in energy"},
-                {"name": "Impulsivity"}
-            ],
-            "Post-Traumatic Stress Disorder": [
-                {"name": "Flashbacks"},
-                {"name": "Nightmares"},
-                {"name": "Avoidance"},
-                {"name": "Hypervigilance"},
-                {"name": "Emotional numbness"}
-            ],
-            "Obsessive-Compulsive Disorder": [
-                {"name": "Intrusive thoughts"},
-                {"name": "Compulsive behaviors"},
-                {"name": "Anxiety about rituals"},
-                {"name": "Time-consuming rituals"},
-                {"name": "Distress when rituals interrupted"}
-            ]
-        }
-        
-        if disorder and disorder != 'all':
-            return symptoms_map.get(disorder, [])
-        
-        # If no disorder specified or 'all' selected, return all symptoms
-        all_symptoms = []
-        for symptoms in symptoms_map.values():
-            all_symptoms.extend(symptoms)
-        return list({s['name']: s for s in all_symptoms}.values())  # Remove duplicates
-        
+        driver = get_neo4j_connection()
+        if not driver:
+            raise HTTPException(status_code=500, detail="Database connection error")
+            
+        with driver.session() as session:
+            if disorder and disorder != 'all':
+                # Get symptoms for a specific disorder
+                result = session.run(
+                    """
+                    MATCH (d:Disorder {name: $disorder})-[:HAS_SYMPTOM]->(s:Symptom)
+                    RETURN s.name as name
+                    """,
+                    disorder=disorder
+                )
+                symptoms = [{"name": record["name"]} for record in result]
+            else:
+                # Get all symptoms
+                result = session.run("MATCH (s:Symptom) RETURN DISTINCT s.name as name")
+                symptoms = [{"name": record["name"]} for record in result]
+                
+        driver.close()
+        return symptoms
     except Exception as e:
         logger.error(f"Error fetching symptoms: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch symptoms") 
+        raise HTTPException(status_code=500, detail="Failed to fetch symptoms")
+
+@router.get("/disorders")
+def get_disorders(
+    current_user: User = Depends(get_current_user)
+):
+    """Get all mental health disorders."""
+    try:
+        driver = get_neo4j_connection()
+        if not driver:
+            raise HTTPException(status_code=500, detail="Database connection error")
+            
+        with driver.session() as session:
+            result = session.run("MATCH (d:Disorder) RETURN d.name as name")
+            disorders = [{"name": record["name"]} for record in result]
+                
+        driver.close()
+        return disorders
+    except Exception as e:
+        logger.error(f"Error fetching disorders: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch disorders") 

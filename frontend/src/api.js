@@ -31,6 +31,33 @@ api.interceptors.response.use(
       localStorage.clear();
       window.location.href = "/login";
     }
+    
+    // Handle validation errors
+    if (error.response?.data?.detail) {
+      // Normalize validation errors to strings
+      if (typeof error.response.data.detail === 'object') {
+        try {
+          // If it's a validation error object with standard FastAPI format
+          const validationObj = error.response.data.detail;
+          if (validationObj.type && validationObj.msg) {
+            error.response.data.detail = validationObj.msg;
+          } else if (Array.isArray(validationObj)) {
+            // If it's an array of validation errors
+            error.response.data.detail = validationObj
+              .map(err => err.msg || JSON.stringify(err))
+              .join(', ');
+          } else {
+            // Generic fallback for other object formats
+            error.response.data.detail = JSON.stringify(validationObj);
+          }
+        } catch (e) {
+          // If JSON stringify fails, set a generic error
+          error.response.data.detail = "An error occurred with the request";
+          console.error("Error processing validation error:", e);
+        }
+      }
+    }
+    
     return Promise.reject(error);
   }
 );

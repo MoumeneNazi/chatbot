@@ -1,21 +1,237 @@
 .progress-page {
-  max-width: 800px;
-  margin: 100px auto;
+  max-width: 1200px;
+  margin: 0 auto;
   padding: 2rem;
+  font-family: 'Poppins', Arial, sans-serif;
 }
 
-.summary-grid {
+.progress-page h1 {
+  font-size: 2.5rem;
+  color: #2c3e50;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+}
+
+.progress-page h2 {
+  font-size: 1.8rem;
+  color: #34495e;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+/* Progress summary section */
+.progress-summary {
+  background-color: #f8f9fa;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+}
+
+.progress-section {
+  margin-bottom: 2rem;
+}
+
+.stat-cards {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
-  margin-top: 2rem;
+  gap: 1.5rem;
+  margin-top: 1rem;
 }
 
-.summary-box {
-  background: #eef2ff;
-  padding: 1.5rem;
+.stat-card {
+  background-color: #fff;
   border-radius: 8px;
-  flex: 1 1 200px;
+  padding: 1.5rem;
+  flex: 1;
+  min-width: 200px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card h3 {
+  font-size: 1.2rem;
+  color: #7f8c8d;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #3498db;
+  margin: 0.5rem 0;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #95a5a6;
+}
+
+/* Treatment section */
+.treatment-section {
+  margin-top: 3rem;
+}
+
+.treatments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.treatment-card {
+  background-color: #fff;
+  border-radius: 10px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  border-left: 4px solid #3498db;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.treatment-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+}
+
+.treatment-card.completed {
+  border-left-color: #2ecc71;
+}
+
+.treatment-card.canceled {
+  border-left-color: #e74c3c;
+}
+
+.treatment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.treatment-header h3 {
+  font-size: 1.5rem;
+  color: #2c3e50;
+  font-weight: 600;
+  margin: 0;
+}
+
+.status-badge {
+  padding: 0.35rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: white;
+}
+
+.status-badge.active {
+  background-color: #3498db;
+}
+
+.status-badge.completed {
+  background-color: #2ecc71;
+}
+
+.status-badge.canceled {
+  background-color: #e74c3c;
+}
+
+.treatment-content {
+  margin: 1rem 0;
+  font-size: 1.1rem;
+  color: #34495e;
+  line-height: 1.6;
+}
+
+.treatment-footer {
+  margin-top: 1.5rem;
+}
+
+.treatment-dates {
+  display: flex;
+  justify-content: space-between;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.progress-bar-container {
+  height: 12px;
+  background-color: #ecf0f1;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 1rem;
+  position: relative;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #3498db;
+  border-radius: 6px;
+  transition: width 1s ease;
+}
+
+.progress-percentage {
+  display: block;
   text-align: center;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.no-treatments {
+  background-color: #f8f9fa;
+  border-radius: 10px;
+  padding: 2rem;
+  text-align: center;
+  color: #7f8c8d;
+}
+
+.no-treatments p {
+  margin: 0.5rem 0;
+  font-size: 1.1rem;
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 4rem 0;
+  font-size: 1.2rem;
+  color: #7f8c8d;
+}
+
+.error {
+  color: #e74c3c;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .progress-page {
+    padding: 1rem;
+  }
+  
+  .stat-cards {
+    flex-direction: column;
+  }
+  
+  .treatment-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .status-badge {
+    margin-top: 0.5rem;
+  }
+  
+  .treatment-dates {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 }

@@ -1,7 +1,8 @@
 .admin-dashboard {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 1rem;
+    padding: 2rem;
+    font-family: 'Poppins', Arial, sans-serif;
   }
   
   .user-list {
@@ -61,6 +62,346 @@
   
   .dashboard-header h2 {
     margin: 0;
-    color: #333;
+    font-size: 2rem;
+    color: #2c3e50;
+  }
+  
+  .dashboard-actions {
+    display: flex;
+    gap: 1rem;
+  }
+  
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 2rem;
+  }
+  
+  /* Patients list */
+  .patients-list {
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  }
+  
+  .patients-list h3 {
+    margin-top: 0;
+    color: #34495e;
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .user-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  
+  .user-card {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+  }
+  
+  .user-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .user-card.selected {
+    border-left-color: #3498db;
+    background-color: #f1f8fe;
+  }
+  
+  .user-card h4 {
+    margin: 0;
+    margin-bottom: 0.5rem;
+    color: #2c3e50;
+  }
+  
+  .user-card p {
+    margin: 0.3rem 0;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+  }
+  
+  .user-actions {
+    display: flex;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+  }
+  
+  .user-actions button {
+    padding: 0.25rem 0.5rem;
+    background-color: #ecf0f1;
+    border: none;
+    border-radius: 4px;
+    color: #34495e;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .user-actions button:hover {
+    background-color: #dfe6e9;
+  }
+  
+  /* Treatment section */
+  .treatment-section {
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  }
+  
+  .treatment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  .treatment-header h3 {
+    margin: 0;
+    color: #34495e;
+    font-size: 1.5rem;
+  }
+  
+  .add-treatment-btn {
+    padding: 0.6rem 1rem;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+  }
+  
+  .add-treatment-btn:hover {
+    background-color: #2980b9;
+  }
+  
+  /* Treatment form */
+  .treatment-form {
+    background-color: #fff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  .form-group {
+    margin-bottom: 1.2rem;
+    position: relative;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #34495e;
+    font-weight: 500;
+  }
+  
+  .form-group select,
+  .form-group input,
+  .form-group textarea {
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid #dce0e3;
+    border-radius: 4px;
+    font-family: inherit;
+    color: #2c3e50;
+  }
+  
+  .form-group textarea {
+    resize: vertical;
+    min-height: 100px;
+  }
+  
+  .submit-btn {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+  }
+  
+  .submit-btn:hover {
+    background-color: #219653;
+  }
+  
+  /* Treatments list */
+  .treatments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .treatment-card {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 1.2rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  }
+  
+  .treatment-card .treatment-header {
+    margin-bottom: 0.8rem;
+    border-bottom: 1px solid #ecf0f1;
+    padding-bottom: 0.8rem;
+  }
+  
+  .treatment-card h4 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.2rem;
+  }
+  
+  .treatment-status {
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    color: white;
+  }
+  
+  .status-active {
+    background-color: #3498db;
+  }
+  
+  .status-completed {
+    background-color: #27ae60;
+  }
+  
+  .status-canceled {
+    background-color: #e74c3c;
+  }
+  
+  .treatment-plan {
+    color: #34495e;
+    margin: 0.8rem 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  
+  .treatment-details {
+    display: flex;
+    justify-content: space-between;
+    color: #7f8c8d;
+    font-size: 0.85rem;
+    margin-top: 1rem;
+  }
+  
+  .treatment-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.8rem;
+    margin-top: 1.2rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid #ecf0f1;
+  }
+  
+  .complete-btn,
+  .cancel-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+  }
+  
+  .complete-btn {
+    background-color: #27ae60;
+    color: white;
+  }
+  
+  .complete-btn:hover {
+    background-color: #219653;
+  }
+  
+  .cancel-btn {
+    background-color: #e74c3c;
+    color: white;
+  }
+  
+  .cancel-btn:hover {
+    background-color: #c0392b;
+  }
+  
+  /* Error and loading states */
+  .error {
+    color: #e74c3c;
+    padding: 1rem;
+    background-color: #fdedec;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+  
+  .loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 300px;
+    color: #7f8c8d;
+    font-size: 1.2rem;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 992px) {
+    .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .treatment-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.8rem;
+    }
+    
+    .treatment-details {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+  }
+  
+  /* Disorder search dropdown */
+  .disorder-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: white;
+    border: 1px solid #dce0e3;
+    border-radius: 0 0 4px 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .disorder-option {
+    padding: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .disorder-option:hover {
+    background-color: #f1f8fe;
+  }
+  
+  /* Add this if you want the input to show as active/focused when the dropdown is open */
+  .form-group input:focus {
+    border-color: #3498db;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
   }
   

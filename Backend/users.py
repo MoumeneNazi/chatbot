@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db, get_all_users, get_user_by_username, promote_user
 from models import User, UserModel
-from dependencies import check_user_role
+from dependencies import check_user_role, get_current_user
 import logging
 
 # Configure logging
@@ -17,7 +17,7 @@ router = APIRouter(
 
 @router.get("/me", response_model=User)
 async def get_current_user_info(
-    current_user: User = Depends(lambda user: check_user_role(user, "user")),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get the current user's information."""
@@ -43,7 +43,7 @@ async def get_current_user_info(
 
 @router.get("/", response_model=list[User])
 async def get_users(
-    current_user: User = Depends(lambda user: check_user_role(user, ["user", "therapist"])),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get all users. Accessible by both users and therapists."""
@@ -70,11 +70,18 @@ async def get_users(
 @router.get("/{username}", response_model=User)
 async def get_user(
     username: str,
-    current_user: User = Depends(lambda user: check_user_role(user, "therapist")),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get a specific user by username. Only accessible by therapists."""
     try:
+        # Check if user is a therapist
+        if current_user.role != "therapist":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Operation not permitted. Required role: therapist"
+            )
+            
         # Prevent confusion with /me endpoint
         if username.lower() == "me":
             raise HTTPException(
@@ -104,11 +111,18 @@ async def get_user(
 @router.post("/{username}/promote", response_model=User)
 async def promote_to_therapist(
     username: str,
-    current_user: User = Depends(lambda user: check_user_role(user, "therapist")),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Promote a user to therapist role. Only accessible by existing therapists."""
     try:
+        # Check if user is a therapist
+        if current_user.role != "therapist":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Operation not permitted. Required role: therapist"
+            )
+            
         logger.info(f"Attempting to promote user {username} to therapist")
         
         # Check if user exists
