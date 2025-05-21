@@ -46,6 +46,13 @@ async def get_current_therapist(current_user: User = Depends(get_current_user)) 
         raise HTTPException(status_code=403, detail="Access forbidden: Therapists only.")
     return current_user
 
+async def get_therapist_or_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Ensure the current user is either a therapist or an admin."""
+    if current_user.role not in ["therapist", "admin"]:
+        logging.debug(f"Access denied for user: {current_user.username}, Role: {current_user.role}")
+        raise HTTPException(status_code=403, detail="Access forbidden: Therapists and Admins only.")
+    return current_user
+
 @router.post("/apply", response_model=TherapistApplication)
 async def apply_for_therapist(
     full_name: str = Form(...),
@@ -78,7 +85,7 @@ async def apply_for_therapist(
             # Create a unique filename
             file_extension = os.path.splitext(document.filename)[1]
             unique_filename = f"{uuid.uuid4()}{file_extension}"
-            document_path = os.path.join("uploads", unique_filename)
+            document_path = unique_filename
             
             # Save the file
             file_location = os.path.join(UPLOAD_DIR, unique_filename)
@@ -142,10 +149,10 @@ async def get_application_status(
 @router.get("/applications", response_model=list[TherapistApplication])
 async def list_applications(
     status: Optional[str] = None,
-    current_user: User = Depends(get_current_therapist),
+    current_user: User = Depends(get_therapist_or_admin),
     db: Session = Depends(get_db)
 ):
-    """List all therapist applications (therapist only)."""
+    """List all therapist applications (therapist and admin)."""
     try:
         query = db.query(TherapistApplicationModel)
         
@@ -165,10 +172,10 @@ async def list_applications(
 async def update_application_status(
     application_id: int,
     status: str = Body(..., embed=True),
-    current_user: User = Depends(get_current_therapist),
+    current_user: User = Depends(get_therapist_or_admin),
     db: Session = Depends(get_db)
 ):
-    """Update the status of a therapist application (therapist only)."""
+    """Update the status of a therapist application (therapist and admin)."""
     try:
         if status not in ["pending", "approved", "rejected"]:
             raise HTTPException(
@@ -230,6 +237,35 @@ async def get_user_chat(
         logging.error(f"Error fetching chat history: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch chat history")
 
+@router.post("/chat/{username}")
+async def send_message_to_user(
+    username: str,
+    message_data: dict = Body(...),
+    current_user: User = Depends(get_current_therapist),
+    db: Session = Depends(get_db)
+):
+    """Send a message to a user (therapist only)."""
+    try:
+        user = db.query(UserModel).filter(UserModel.username == username).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Record therapist message in database
+        therapist_message = ChatMessageModel(
+            user_id=user.id,
+            role="therapist",
+            content=message_data.get("message"),
+            timestamp=datetime.utcnow()
+        )
+        db.add(therapist_message)
+        db.commit()
+        
+        return {"message": message_data.get("message")}
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error sending message to user: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send message")
+
 @router.get("/journal/{username}")
 async def get_user_journal(
     username: str,
@@ -270,31 +306,9 @@ async def list_users(current_user: User = Depends(get_current_therapist), db: Se
         logging.error(f"Error listing users: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch users")
 
-@router.put("/promote/{username}")
-async def promote_user(
-    username: str, 
-    current_user: User = Depends(get_current_therapist), 
-    db: Session = Depends(get_db)
-):
-    """Promote a user to therapist role (therapist only)."""
-    try:
-        user = db.query(UserModel).filter(UserModel.username == username).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        logging.debug(f"Promoting user: {username}, Current Role: {user.role}")
-        user.role = "therapist"
-        db.commit()
-        db.refresh(user)
-        logging.debug(f"User {username} promoted successfully. New Role: {user.role}")
-        return {"msg": f"{username} has been promoted to therapist"}
-    except Exception as e:
-        logging.error(f"Error promoting user: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to promote user")
-
 @router.get("/disorders")
 async def get_disorders(
-    current_user: User = Depends(get_current_therapist)
+    current_user: User = Depends(get_therapist_or_admin)
 ):
     """Get all mental health disorders from Neo4j."""
     try:
@@ -415,38 +429,341 @@ async def update_treatment_status(
     current_user: User = Depends(get_current_therapist),
     journal_db: Session = Depends(get_journal_db)
 ):
-    """Update the status of a treatment (Active, Completed, Canceled)."""
+    """Update the status of a treatment plan (therapist only)."""
     try:
         if status not in ["Active", "Completed", "Canceled"]:
-            raise HTTPException(status_code=400, detail="Invalid status. Must be 'Active', 'Completed', or 'Canceled'.")
-        
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid status. Must be 'Active', 'Completed', or 'Canceled'"
+            )
+            
         treatment = journal_db.query(DisorderTreatmentModel).filter(
             DisorderTreatmentModel.id == treatment_id
         ).first()
         
         if not treatment:
-            raise HTTPException(status_code=404, detail="Treatment not found")
-        
-        # Verify the therapist is authorized to update this treatment
-        if treatment.therapist_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Not authorized to update this treatment")
+            raise HTTPException(status_code=404, detail="Treatment plan not found")
         
         treatment.status = status
         treatment.updated_at = datetime.utcnow()
         
         journal_db.commit()
-        journal_db.refresh(treatment)
         
-        return {
-            "id": treatment.id,
-            "user_id": treatment.user_id,
-            "disorder": treatment.disorder,
-            "status": treatment.status,
-            "updated_at": treatment.updated_at.isoformat()
-        }
+        return {"message": f"Treatment status updated to {status}"}
     except HTTPException:
         raise
     except Exception as e:
         journal_db.rollback()
         logging.error(f"Error updating treatment status: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to update treatment status: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update treatment status: {str(e)}"
+        )
+
+@router.post("/fix-document-paths")
+async def fix_document_paths(
+    current_user: User = Depends(get_current_therapist),
+    db: Session = Depends(get_db)
+):
+    """Fix existing document paths by removing the 'uploads/' prefix."""
+    try:
+        # Find all applications with document paths that start with 'uploads/'
+        applications = db.query(TherapistApplicationModel).filter(
+            TherapistApplicationModel.document_path.like("uploads/%")
+        ).all()
+        
+        fixed_count = 0
+        for app in applications:
+            # Extract just the filename
+            filename = os.path.basename(app.document_path)
+            app.document_path = filename
+            fixed_count += 1
+        
+        db.commit()
+        
+        return {"message": f"Fixed {fixed_count} document paths"}
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error fixing document paths: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fix document paths: {str(e)}"
+        )
+
+@router.get("/symptoms")
+async def get_symptoms(
+    disorder: Optional[str] = None,
+    current_user: User = Depends(get_therapist_or_admin)
+):
+    """Get all symptoms or symptoms for a specific disorder."""
+    try:
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        with driver.session() as session:
+            if disorder:
+                # Get symptoms for a specific disorder
+                result = session.run(
+                    """
+                    MATCH (d:Disorder {name: $disorder})-[:HAS_SYMPTOM]->(s:Symptom)
+                    RETURN s.name AS name ORDER BY s.name
+                    """,
+                    disorder=disorder
+                )
+            else:
+                # Get all symptoms
+                result = session.run("MATCH (s:Symptom) RETURN s.name AS name ORDER BY s.name")
+            
+            symptoms = [record["name"] for record in result]
+        driver.close()
+        return symptoms
+    except Exception as e:
+        logging.error(f"Error fetching symptoms: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch symptoms: {str(e)}")
+
+@router.post("/disorders")
+async def add_disorder(
+    disorder_data: dict = Body(...),
+    current_user: User = Depends(get_therapist_or_admin)
+):
+    """Add a new disorder to the knowledge base."""
+    try:
+        name = disorder_data.get("name")
+        if not name:
+            raise HTTPException(status_code=400, detail="Disorder name is required")
+        
+        # Check if disorder already exists
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        with driver.session() as session:
+            result = session.run(
+                "MATCH (d:Disorder {name: $name}) RETURN d.name",
+                name=name
+            )
+            if result.single():
+                driver.close()
+                raise HTTPException(status_code=400, detail=f"Disorder '{name}' already exists")
+            
+            # Create disorder
+            session.run(
+                "CREATE (d:Disorder {name: $name})",
+                name=name
+            )
+        driver.close()
+        
+        return {"message": f"Disorder '{name}' added successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error adding disorder: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to add disorder: {str(e)}")
+
+@router.post("/symptoms")
+async def add_symptom(
+    symptom_data: dict = Body(...),
+    current_user: User = Depends(get_therapist_or_admin)
+):
+    """Add a new symptom and optionally associate it with disorder(s)."""
+    try:
+        name = symptom_data.get("name")
+        disorders = symptom_data.get("disorders", [])
+        
+        if not name:
+            raise HTTPException(status_code=400, detail="Symptom name is required")
+        
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        with driver.session() as session:
+            # Create symptom
+            session.run(
+                "MERGE (s:Symptom {name: $name})",
+                name=name
+            )
+            
+            # Create relationships with disorders if provided
+            for disorder in disorders:
+                # Check if disorder exists
+                result = session.run(
+                    "MATCH (d:Disorder {name: $name}) RETURN d.name",
+                    name=disorder
+                )
+                if not result.single():
+                    continue  # Skip if disorder doesn't exist
+                
+                # Create relationship
+                session.run(
+                    """
+                    MATCH (d:Disorder {name: $disorder})
+                    MATCH (s:Symptom {name: $symptom})
+                    MERGE (d)-[:HAS_SYMPTOM]->(s)
+                    """,
+                    disorder=disorder,
+                    symptom=name
+                )
+        driver.close()
+        
+        if disorders:
+            return {"message": f"Symptom '{name}' added and linked to {len(disorders)} disorders"}
+        else:
+            return {"message": f"Symptom '{name}' added successfully"}
+    except Exception as e:
+        logging.error(f"Error adding symptom: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to add symptom: {str(e)}")
+
+@router.post("/disorders/{disorder_name}/symptoms")
+async def link_symptom_to_disorder(
+    disorder_name: str,
+    symptom_data: dict = Body(...),
+    current_user: User = Depends(get_therapist_or_admin)
+):
+    """Link an existing symptom to a disorder or create a new symptom."""
+    try:
+        symptom_name = symptom_data.get("name")
+        if not symptom_name:
+            raise HTTPException(status_code=400, detail="Symptom name is required")
+        
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        with driver.session() as session:
+            # Check if disorder exists
+            disorder_result = session.run(
+                "MATCH (d:Disorder {name: $name}) RETURN d.name",
+                name=disorder_name
+            )
+            if not disorder_result.single():
+                driver.close()
+                raise HTTPException(status_code=404, detail=f"Disorder '{disorder_name}' not found")
+            
+            # Create symptom if it doesn't exist
+            session.run(
+                "MERGE (s:Symptom {name: $name})",
+                name=symptom_name
+            )
+            
+            # Create relationship
+            session.run(
+                """
+                MATCH (d:Disorder {name: $disorder})
+                MATCH (s:Symptom {name: $symptom})
+                MERGE (d)-[:HAS_SYMPTOM]->(s)
+                """,
+                disorder=disorder_name,
+                symptom=symptom_name
+            )
+        driver.close()
+        
+        return {"message": f"Symptom '{symptom_name}' linked to disorder '{disorder_name}'"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error linking symptom to disorder: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to link symptom to disorder: {str(e)}")
+
+@router.delete("/disorders/{disorder_name}")
+async def delete_disorder(
+    disorder_name: str,
+    current_user: User = Depends(get_therapist_or_admin)
+):
+    """Delete a disorder from the knowledge base."""
+    try:
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        with driver.session() as session:
+            # Check if disorder exists
+            disorder_result = session.run(
+                "MATCH (d:Disorder {name: $name}) RETURN d.name",
+                name=disorder_name
+            )
+            if not disorder_result.single():
+                driver.close()
+                raise HTTPException(status_code=404, detail=f"Disorder '{disorder_name}' not found")
+            
+            # Delete disorder and its relationships
+            session.run(
+                """
+                MATCH (d:Disorder {name: $name})
+                DETACH DELETE d
+                """,
+                name=disorder_name
+            )
+        driver.close()
+        
+        return {"message": f"Disorder '{disorder_name}' deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error deleting disorder: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete disorder: {str(e)}")
+
+@router.delete("/symptoms/{symptom_name}")
+async def delete_symptom(
+    symptom_name: str,
+    current_user: User = Depends(get_therapist_or_admin)
+):
+    """Delete a symptom from the knowledge base."""
+    try:
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        with driver.session() as session:
+            # Check if symptom exists
+            symptom_result = session.run(
+                "MATCH (s:Symptom {name: $name}) RETURN s.name",
+                name=symptom_name
+            )
+            if not symptom_result.single():
+                driver.close()
+                raise HTTPException(status_code=404, detail=f"Symptom '{symptom_name}' not found")
+            
+            # Delete symptom and its relationships
+            session.run(
+                """
+                MATCH (s:Symptom {name: $name})
+                DETACH DELETE s
+                """,
+                name=symptom_name
+            )
+        driver.close()
+        
+        return {"message": f"Symptom '{symptom_name}' deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error deleting symptom: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete symptom: {str(e)}")
+
+@router.delete("/disorders/{disorder_name}/symptoms/{symptom_name}")
+async def unlink_symptom_from_disorder(
+    disorder_name: str,
+    symptom_name: str,
+    current_user: User = Depends(get_therapist_or_admin)
+):
+    """Remove the link between a symptom and a disorder."""
+    try:
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        with driver.session() as session:
+            # Check if relationship exists
+            relationship_result = session.run(
+                """
+                MATCH (d:Disorder {name: $disorder})-[r:HAS_SYMPTOM]->(s:Symptom {name: $symptom})
+                RETURN r
+                """,
+                disorder=disorder_name,
+                symptom=symptom_name
+            )
+            if not relationship_result.single():
+                driver.close()
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"Relationship between disorder '{disorder_name}' and symptom '{symptom_name}' not found"
+                )
+            
+            # Delete relationship
+            session.run(
+                """
+                MATCH (d:Disorder {name: $disorder})-[r:HAS_SYMPTOM]->(s:Symptom {name: $symptom})
+                DELETE r
+                """,
+                disorder=disorder_name,
+                symptom=symptom_name
+            )
+        driver.close()
+        
+        return {"message": f"Symptom '{symptom_name}' unlinked from disorder '{disorder_name}'"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error unlinking symptom from disorder: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to unlink symptom from disorder: {str(e)}")

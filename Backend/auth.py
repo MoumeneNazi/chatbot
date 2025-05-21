@@ -97,6 +97,15 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
+        # Check if user account is active
+        if not user.is_active:
+            logger.warning(f"Deactivated account attempted login: {form_data.username}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account has been deactivated. Please contact an administrator.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
         # Check if user has valid role
         if user.role not in ROLE_HIERARCHY:
             logger.error(f"Invalid role for user {user.username}: {user.role}")

@@ -26,6 +26,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours
 
 # Role hierarchy definition
 ROLE_HIERARCHY = {
+    "admin": ["admin", "therapist", "user"],  # Admin has access to all endpoints
     "therapist": ["therapist", "user"],  # Therapist can access both therapist and user endpoints
     "user": ["user"]  # User can only access user endpoints
 }
@@ -64,6 +65,14 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     if user.role != role:
         logger.warning(f"Token role mismatch. Token: {role}, User: {user.role}")
         raise credentials_exception
+    
+    # Check if account is active
+    if not user.is_active:
+        logger.warning(f"Deactivated account attempted access: {username}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account has been deactivated, please contact an administrator"
+        )
         
     logger.info(f"User {username} authenticated successfully")
     return user
@@ -114,5 +123,23 @@ def get_current_therapist(current_user: User = Depends(get_current_user)) -> Use
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Operation requires therapist role"
+        )
+    return current_user
+
+async def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Ensure the current user is an admin."""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden: Admins only"
+        )
+    return current_user
+
+async def get_therapist_or_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Ensure the current user is either a therapist or an admin."""
+    if current_user.role not in ["therapist", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden: Therapists and Admins only"
         )
     return current_user

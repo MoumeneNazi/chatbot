@@ -49,6 +49,7 @@ export function AuthProvider({ children }) {
 
   const hasPermission = (requiredRole) => {
     const roleHierarchy = {
+      admin: ["admin", "therapist", "user"],
       therapist: ["therapist", "user"],
       user: ["user"]
     };
@@ -69,6 +70,7 @@ export function AuthProvider({ children }) {
       logout,
       hasPermission,
       isAuthenticated: !!token,
+      isAdmin: role === "admin",
       isTherapist: role === "therapist",
       isUser: role === "user"
     }}>

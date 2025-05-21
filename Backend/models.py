@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from typing import Optional, List
+from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
@@ -16,15 +17,20 @@ class UserModel(Base):
     role = Column(String, default="user")  # "user" or "therapist"
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True)  # Track if account is active
+    messages = relationship("ChatMessageModel", back_populates="user")
+    problem_reports = relationship("ProblemReportModel", back_populates="user")
 
 class ChatMessageModel(Base):
     __tablename__ = "chat_messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    role = Column(String, nullable=False)  # 'user' or 'assistant'
     content = Column(Text, nullable=False)
-    role = Column(String, nullable=False)  # "user" or "assistant"
     timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("UserModel", back_populates="messages")
 
 class JournalModel(Base):
     __tablename__ = "journals"
@@ -75,6 +81,20 @@ class TherapistApplicationModel(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class ProblemReportModel(Base):
+    __tablename__ = "problem_reports"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    category = Column(String, nullable=False)  # 'technical', 'content', 'suggestion', etc.
+    status = Column(String, default="pending")  # 'pending', 'in_progress', 'resolved', 'closed'
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    user = relationship("UserModel", back_populates="problem_reports")
+
 # Pydantic Models for API
 class UserBase(BaseModel):
     username: str
@@ -85,11 +105,15 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
-class User(UserBase):
+class User(BaseModel):
+    """User model for API operations."""
     id: int
-    role: str
+    username: str
+    role: str  # "user", "therapist", or "admin"
+    is_active: bool = True
     created_at: datetime
     last_login: Optional[datetime] = None
+    email: Optional[str] = None  # Make email optional since it's not in the database
 
     class Config:
         from_attributes = True
@@ -181,4 +205,25 @@ class TherapistApplication(BaseModel):
     updated_at: datetime
     
     class Config:
-        from_attributes = True 
+        from_attributes = True
+
+class ProblemReportCreate(BaseModel):
+    title: str
+    description: str
+    category: str
+
+class ProblemReportUpdate(BaseModel):
+    status: str
+
+class ProblemReport(BaseModel):
+    id: int
+    user_id: int
+    title: str
+    description: str
+    category: str
+    status: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        orm_mode = True 

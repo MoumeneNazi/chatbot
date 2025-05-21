@@ -15,6 +15,13 @@ import Therapist from "./pages/Therapist";
 import TherapistChat from "./pages/TherapistChat";
 import TherapistJournal from "./pages/TherapistJournal";
 import TherapistApplication from "./pages/TherapistApplication";
+import DisorderManager from "./pages/DisorderManager";
+import AdminDashboard from "./pages/AdminDashboard";
+import UserManagement from "./pages/UserManagement";
+import ApplicationManagement from "./pages/ApplicationManagement";
+import CreateAdmin from "./pages/CreateAdmin";
+import ProblemReports from "./pages/ProblemReports";
+import TherapistApplications from "./pages/TherapistApplications";
 
 const ProtectedRoute = ({ children, roles }) => {
   const { token, hasPermission } = useAuth();
@@ -115,10 +122,68 @@ const AppRoutes = () => (
       }
     />
     <Route
+      path="/therapist/disorders"
+      element={
+        <ProtectedRoute roles={["therapist", "admin"]}>
+          <DisorderManager />
+        </ProtectedRoute>
+      }
+    />
+    <Route
       path="/therapist"
       element={
         <ProtectedRoute roles={["therapist"]}>
           <Therapist />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/therapist/applications"
+      element={
+        <ProtectedRoute roles={["therapist"]}>
+          <TherapistApplications />
+        </ProtectedRoute>
+      }
+    />
+
+    {/* Admin Routes */}
+    <Route
+      path="/admin/dashboard"
+      element={
+        <ProtectedRoute roles={["admin"]}>
+          <AdminDashboard />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/admin/users"
+      element={
+        <ProtectedRoute roles={["admin"]}>
+          <UserManagement />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/admin/applications"
+      element={
+        <ProtectedRoute roles={["admin"]}>
+          <ApplicationManagement />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/admin/create-admin"
+      element={
+        <ProtectedRoute roles={["admin"]}>
+          <CreateAdmin />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/admin/problems"
+      element={
+        <ProtectedRoute roles={["admin", "therapist"]}>
+          <ProblemReports />
         </ProtectedRoute>
       }
     />

@@ -179,7 +179,7 @@ const TherapistChat = () => {
                       {new Date(message.timestamp).toLocaleString()}
                     </span>
                   </div>
-                  <div className="message-content">{message.content}</div>
+                  <div className="message-content">{message.message}</div>
                 </div>
               ))
             ) : (

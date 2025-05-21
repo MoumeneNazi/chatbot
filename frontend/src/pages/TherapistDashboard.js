@@ -462,7 +462,7 @@ function TherapistDashboard() {
                       {app.document_path && (
                         <p>
                           <strong>Document:</strong> 
-                          <a href={`/Backend/${app.document_path}`} target="_blank" rel="noopener noreferrer">
+                          <a href={`/uploads/${app.document_path}`} target="_blank" rel="noopener noreferrer">
                             View Document
                           </a>
                         </p>

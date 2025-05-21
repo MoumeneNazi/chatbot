@@ -133,4 +133,23 @@ See `structure.txt` for detailed project structure.
 5. Create a Pull Request
 
 ## License
-MIT License - see LICENSE file for details 
+MIT License - see LICENSE file for details
+
+## Administration
+
+### Creating the First Admin User
+
+To create the first admin user, run the following command:
+
+```bash
+cd Backend
+python create_admin.py
+```
+
+Follow the prompts to create an admin username, email, and password. Once created, you can log in with these credentials and access the admin dashboard at `/admin/dashboard`.
+
+As an admin, you can:
+- Manage all user accounts (create, update roles, delete)
+- Review and approve therapist applications
+- Manage disorders and symptoms in the knowledge base
+- Create other admin accounts 

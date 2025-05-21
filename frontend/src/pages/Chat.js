@@ -55,7 +55,7 @@ function Chat() {
       // Add bot response to UI
       const botMessage = {
         role: 'assistant',
-        content: response.data.response,
+        content: response.data.message,
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, botMessage]);
@@ -133,7 +133,7 @@ function Chat() {
       <div className="chat-box" ref={chatBoxRef}>
         {messages.map((msg, i) => (
           <div key={i} className={`chat-bubble ${msg.role}`}>
-            <p>{msg.content}</p>
+            <p>{msg.message || msg.content}</p>
             <span>{new Date(msg.timestamp).toLocaleTimeString()}</span>
           </div>
         ))}

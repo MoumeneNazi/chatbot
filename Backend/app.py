@@ -2,6 +2,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+import os
 from auth import router as auth_router
 from chatbot import router as chatbot_router
 from journal import router as journal_router
@@ -10,6 +12,7 @@ from users import router as users_router
 from admin import router as admin_router
 from therapist import router as therapist_router
 from progress import router as progress_router
+from problem_reports import router as problem_reports_router
 from database import Base, engine
 from journal_database import JournalBase, journal_engine
 import logging
@@ -54,6 +57,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": "; ".join(error_messages)}
     )
 
+# Configure static file serving for uploads directory
+uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+
 # Include routers
 app.include_router(auth_router)
 app.include_router(chatbot_router)
@@ -63,6 +71,7 @@ app.include_router(users_router)
 app.include_router(admin_router)
 app.include_router(therapist_router)
 app.include_router(progress_router)
+app.include_router(problem_reports_router)
 
 @app.get("/")
 def read_root():
