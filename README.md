@@ -25,7 +25,6 @@ A comprehensive mental health platform that combines AI-powered chat support wit
 - SQLAlchemy (ORM)
 - PostgreSQL (Database)
 - Neo4j (Graph database for symptom-disorder relationships)
-- Groq API (AI model integration)
 - JWT Authentication
 - CORS middleware
 
