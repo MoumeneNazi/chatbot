@@ -1,6 +1,6 @@
 # Mental Health Chatbot Platform
 
-A comprehensive mental health platform that combines AI-powered chat support with professional therapist oversight.
+A comprehensive mental health platform that combines NLP-powered chat support with professional therapist oversight.
 
 ## Features
 
