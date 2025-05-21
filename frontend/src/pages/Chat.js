@@ -8,6 +8,7 @@ function Chat() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
+  const [exporting, setExporting] = useState(false);
   const chatBoxRef = useRef(null);
   const { userId } = useParams();
   const { role } = useAuth();
@@ -78,6 +79,22 @@ function Chat() {
     }
   };
 
+  const exportChat = async () => {
+    try {
+      setExporting(true);
+      const endpoint = role === 'therapist' && userId 
+        ? `/api/chat/export/${userId}`
+        : '/api/chat/export';
+      
+      // Open the export URL in a new tab/window
+      window.open(endpoint, '_blank');
+    } catch (error) {
+      console.error('Error exporting chat:', error);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (chatBoxRef.current) {
@@ -92,12 +109,27 @@ function Chat() {
 
   return (
     <div className="chat-page">
-      <h2>
-        {role === 'therapist' && selectedUser 
-          ? `Chat with ${selectedUser.username}`
-          : 'Your Conversation'
-        }
-      </h2>
+      <div className="chat-header">
+        <h2>
+          {role === 'therapist' && selectedUser 
+            ? `Chat with ${selectedUser.username}`
+            : 'Your Conversation'
+          }
+        </h2>
+        <button 
+          className="export-button" 
+          onClick={exportChat} 
+          disabled={exporting || messages.length === 0}
+          title="Export chat as HTML"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          {exporting ? 'Exporting...' : 'Share'}
+        </button>
+      </div>
       <div className="chat-box" ref={chatBoxRef}>
         {messages.map((msg, i) => (
           <div key={i} className={`chat-bubble ${msg.role}`}>

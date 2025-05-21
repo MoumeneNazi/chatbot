@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from typing import Optional, List
 
@@ -58,6 +58,22 @@ class ReviewModel(Base):
     disorder = Column(String, nullable=False)
     specialty = Column(String)
     timestamp = Column(DateTime, default=datetime.utcnow)
+
+class TherapistApplicationModel(Base):
+    __tablename__ = "therapist_applications"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    full_name = Column(String, nullable=False)
+    email = Column(String, nullable=False)
+    specialty = Column(String, nullable=False)
+    license_number = Column(String, nullable=False)
+    certification = Column(String, nullable=False)
+    experience_years = Column(Integer, nullable=False)
+    document_path = Column(String, nullable=True)  # Path to uploaded document
+    status = Column(String, default="pending")  # "pending", "approved", "rejected"
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 # Pydantic Models for API
 class UserBase(BaseModel):
@@ -141,3 +157,28 @@ class ReviewCreate(BaseModel):
     content: str
     disorder: str
     specialty: Optional[str] = None 
+
+class TherapistApplicationCreate(BaseModel):
+    full_name: str
+    email: str
+    specialty: str
+    license_number: str
+    certification: str
+    experience_years: int = Field(..., ge=0)
+    
+class TherapistApplication(BaseModel):
+    id: int
+    user_id: int
+    full_name: str
+    email: str
+    specialty: str
+    license_number: str
+    certification: str
+    experience_years: int
+    document_path: Optional[str] = None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True 

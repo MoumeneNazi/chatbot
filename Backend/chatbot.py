@@ -1,248 +1,117 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from neo4j import GraphDatabase
-import json
-import os
-import random
+import json, os, logging
 from datetime import datetime
-from textblob import TextBlob
-import groq
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from dependencies import get_current_user, check_user_role
+from dependencies import get_current_user
 from database import get_db
 from sqlalchemy.orm import Session
 from models import ChatMessageModel, User, UserModel
-import logging
-import re
+import vertexai
+from vertexai.generative_models import GenerationConfig, GenerativeModel
 
-# Configure logging
+# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load environment variables for Groq API
-env_path = os.path.join(os.path.dirname(__file__), '.env')
-load_dotenv(dotenv_path=env_path)
-logger.info(f"Loading .env from: {env_path}")
+# Load environment variables
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
-router = APIRouter(
-    prefix="/api",
-    tags=["chat"]
-)
+# Initialize API router
+router = APIRouter(prefix="/api", tags=["chat"])
 
-# Get environment variables
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    raise ValueError("GROQ_API_KEY not found in .env file. Please add it to Backend/.env")
+# Load API keys and configurations
+GEMINI_API_KEY = "AIzaSyAGcXvCDt5hlATBXeu5LAjSVkeqvCZ-MuA"
+if not GEMINI_API_KEY:
+    raise ValueError("Missing GEMINI_API_KEY in .env file")
 
-groq_client = groq.Groq(api_key=GROQ_API_KEY)
+# Initialize Vertex AI
+os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
 
-# Neo4j connection details
+# Neo4j connection settings
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "mimo2021")  # Default password if not in env
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "mimo2021")
 
-logger.info("Attempting to connect to Neo4j...")
-try:
-    # Test Neo4j connection
-    driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-    with driver.session() as session:
-        session.run("RETURN 1")
-    driver.close()
-    logger.info("Successfully connected to Neo4j")
-except Exception as e:
-    logger.error(f"Failed to connect to Neo4j: {str(e)}")
-
+# Model Schema
 class ChatMessage(BaseModel):
     message: str
 
-@router.post("/chatbot")
-async def send_message(
-    message_data: ChatMessage,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    try:
-        message = message_data.message
-        # Create user message
-        user_message = ChatMessageModel(
-            user_id=current_user.id,
-            role="user",
-            content=message,
-            timestamp=datetime.utcnow()
-        )
-        db.add(user_message)
-        
-        # TODO: Add chatbot response logic here
-        bot_response = "I am here to help you. How are you feeling today?"
-        
-        # Create bot message
-        bot_message = ChatMessageModel(
-            user_id=current_user.id,
-            role="assistant",
-            content=bot_response,
-            timestamp=datetime.utcnow()
-        )
-        db.add(bot_message)
-        
-        db.commit()
-        return {"message": bot_response}
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error processing chat message: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to process message")
-
-@router.get("/chat/history")
-async def get_chat_history(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    try:
-        # Get all messages for the current user
-        messages = db.query(ChatMessageModel).filter(
-            ChatMessageModel.user_id == current_user.id
-        ).order_by(ChatMessageModel.timestamp).all()
-        
-        return [
-            {
-                "role": msg.role,
-                "content": msg.content,
-                "timestamp": msg.timestamp.isoformat()
-            }
-            for msg in messages
-        ]
-    except Exception as e:
-        logger.error(f"Error fetching chat history: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch chat history")
-
-@router.get("/chat/history/{user_id}")
-async def get_user_chat_history(
-    user_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Get chat history for a specific user (therapist only)."""
-    try:
-        # Check if user is a therapist
-        if current_user.role != "therapist":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Operation not permitted. Required role: therapist"
-            )
-            
-        # Verify user exists
-        user = db.query(UserModel).filter(UserModel.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        messages = db.query(ChatMessageModel).filter(
-            ChatMessageModel.user_id == user_id
-        ).order_by(ChatMessageModel.timestamp).all()
-        
-        return [
-            {
-                "role": msg.role,
-                "content": msg.content,
-                "timestamp": msg.timestamp.isoformat()
-            }
-            for msg in messages
-        ]
-    except Exception as e:
-        logger.error(f"Error fetching chat history: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch chat history")
-
-def ask_groq(message: str) -> str:
-    try:
-        response = groq_client.chat.completions.create(
-            model="deepseek-r1-distill-llama-70b",
-            messages=[
-                {
-                    "role": "system", 
-                    "content": "You are a warm, compassionate friend providing emotional support. NEVER start your response with '<think>' or similar tags. NEVER include your thought process. Just respond directly as if you're texting a friend who needs support."
-                },
-                {"role": "user", "content": message}
-            ],
-            max_tokens=250,
-            temperature=0.8
-        )
-        
-        content = response.choices[0].message.content.strip()
-        
-        # Check for and remove <think> blocks specifically
-        if "<think>" in content.lower():
-            # If the response has a </think> tag, extract only what comes after it
-            think_end_match = re.search(r'</think>\s*', content, re.IGNORECASE)
-            if think_end_match:
-                content = content[think_end_match.end():].strip()
-            else:
-                # If no end tag, just remove the <think> tag and continue
-                content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL | re.IGNORECASE)
-                
-        # Also check for standalone <think> tag without proper closure
-        content = re.sub(r'^<think>.*?\n', '', content, flags=re.IGNORECASE)
-        
-        # Remove any remaining tags if they exist
-        content = re.sub(r'<[^>]+>.*?</[^>]+>', '', content, flags=re.DOTALL | re.IGNORECASE)
-        
-        # Handle case where entire response might have been in think tags
-        if not content.strip():
-            return "I'm here for you. How can I support you today?"
-        
-        return content
-    except Exception as e:
-        logger.error(f"[Groq API Error]: {str(e)}")
-        return "I'm here for you. What's going on?"
 
 class MentalHealthChatbot:
+    """
+    Mental Health Chatbot with Google Gemini integration and Neo4j knowledge base
+    """
     def __init__(self, uri, user, password, memory_file="session_memory.json"):
+        """Initialize the chatbot with Neo4j connection and load resources"""
+        # Connect to Neo4j
         try:
             self.driver = GraphDatabase.driver(uri, auth=(user, password))
-            # Test the connection
-            with self.driver.session() as session:
-                session.run("RETURN 1")
-            logger.info("Successfully connected to Neo4j")
+            with self.driver.session() as s: 
+                s.run("RETURN 1")
+            logger.info("Neo4j connected successfully")
+            self.neo4j_available = True
         except Exception as e:
-            logger.error(f"Failed to connect to Neo4j: {str(e)}")
+            logger.error(f"Neo4j connection failed: {e}")
             self.driver = None
-            
+            self.neo4j_available = False
+
+        # Initialize Gemini model
+        try:
+            self.model = genai.GenerativeModel('gemini-pro')
+            logger.info("Gemini model initialized successfully")
+            self.gemini_available = True
+        except Exception as e:
+            logger.error(f"Gemini model initialization failed: {e}")
+            self.gemini_available = False
+
+        # Initialize session and knowledge
         self.memory_file = memory_file
         self.session_context = self.load_session()
-        self.symptom_list = self.load_symptom_list() if self.driver else []
-        self.disorder_list = self.load_disorder_list() if self.driver else []
+        self.symptom_list = self.load_symptom_list() if self.neo4j_available else []
+        self.disorder_list = self.load_disorder_list() if self.neo4j_available else []
 
     def load_symptom_list(self):
-        if not self.driver:
+        """Load all symptoms from Neo4j database"""
+        if not self.driver: 
             return []
         try:
-            with self.driver.session() as session:
-                result = session.run("MATCH (s:Symptom) RETURN s.name AS name")
-                return [r["name"] for r in result]
+            with self.driver.session() as s:
+                return [r["name"] for r in s.run("MATCH (s:Symptom) RETURN s.name AS name")]
         except Exception as e:
-            logger.error(f"Error loading symptoms: {str(e)}")
+            logger.error(f"Error loading symptoms: {e}")
             return []
 
     def load_disorder_list(self):
-        if not self.driver:
+        """Load all mental health disorders from Neo4j database"""
+        if not self.driver: 
             return []
         try:
-            with self.driver.session() as session:
-                result = session.run("MATCH (d:Disorder) RETURN d.name AS name")
-                return [r["name"] for r in result]
+            with self.driver.session() as s:
+                return [r["name"] for r in s.run("MATCH (d:Disorder) RETURN d.name AS name")]
         except Exception as e:
-            logger.error(f"Error loading disorders: {str(e)}")
+            logger.error(f"Error loading disorders: {e}")
             return []
 
     def load_session(self):
-        try:
-            if os.path.exists(self.memory_file):
-                with open(self.memory_file, 'r') as f:
+        """Load previous session memory if available"""
+        if os.path.exists(self.memory_file):
+            try:
+                with open(self.memory_file, "r") as f:
                     data = json.load(f)
-                    # Ensure all required fields exist
                     return {
                         "reported_symptoms": data.get("reported_symptoms", []),
                         "session_history": data.get("session_history", []),
                         "last_interaction": data.get("last_interaction", None)
                     }
-        except Exception as e:
-            logger.error(f"Error loading session: {str(e)}")
-        
-        # Return default structure if file doesn't exist or there's an error
+            except Exception as e:
+                logger.warning(f"Session load error: {e}")
+                return self._create_empty_session()
+        return self._create_empty_session()
+
+    def _create_empty_session(self):
+        """Create a new empty session"""
         return {
             "reported_symptoms": [],
             "session_history": [],
@@ -250,123 +119,235 @@ class MentalHealthChatbot:
         }
 
     def save_session(self):
+        """Save the current session to disk"""
         try:
-            # Add timestamp to track last interaction
             self.session_context["last_interaction"] = datetime.now().isoformat()
-            
-            with open(self.memory_file, 'w') as f:
-                json.dump(self.session_context, f, indent=4)
-            logger.info("Session saved successfully")
+            with open(self.memory_file, "w") as f:
+                json.dump(self.session_context, f, indent=2)
         except Exception as e:
-            logger.error(f"Error saving session: {str(e)}")
+            logger.error(f"Failed saving session: {e}")
 
-    def close(self):
-        self.save_session()
-        if self.driver:
-            self.driver.close()
+    def extract_symptoms(self, text):
+        """Extract symptoms from user message based on the Neo4j knowledge base"""
+        return [s for s in self.symptom_list if s.lower() in text.lower()]
 
-    def extract_symptoms(self, user_input):
-        low = user_input.lower()
-        return [name for name in self.symptom_list if name.lower() in low]
+    def find_disorders(self, text):
+        """Find disorders mentioned in user message based on the Neo4j knowledge base"""
+        return [d for d in self.disorder_list if d.lower() in text.lower()]
 
-    def diagnose_disorders(self, symptoms):
-        query = """
-        MATCH (s:Symptom)-[:INDICATES]->(d:Disorder)
-        WHERE s.name IN $symptoms
-        RETURN d.name AS disorder, count(*) AS score
-        ORDER BY score DESC
-        """
-        with self.driver.session() as session:
-            result = session.run(query, symptoms=symptoms)
-            preds, total = [], max(len(symptoms), 1)
-            for r in result:
-                preds.append((r["disorder"], min(100, (r["score"] / total) * 100)))
-            return preds
-
-    def add_journal_entry(self, entry, mood_rating):
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.session_context["journals"].append({
-            "date": now,
-            "entry": entry,
-            "mood_rating": mood_rating
-        })
-        self.save_session()
-
-    def get_journal_entries(self):
-        return self.session_context["journals"]
-
-    def detect_sentiment(self, text):
-        return TextBlob(text).sentiment.polarity
-
-    def chat(self, user_input):
+    def _generate_response_gemini(self, prompt):
+        """Generate a response using Google Gemini API"""
         try:
-            normalized_input = user_input.lower()
-            logger.info(f"Processing chat input: {user_input}")
-            
-            # Add to session history
-            self.session_context["session_history"].append({
-                "user": user_input,
-                "timestamp": datetime.now().isoformat()
-            })
-
-            # Process symptoms if Neo4j is available
-            response = None
-            if self.driver:
-                # Check for disorders
-                for disorder in self.disorder_list:
-                    if disorder.lower() in normalized_input:
-                        response = ask_groq(f"Provide specific information and support about {disorder}, focusing on symptoms, coping strategies, and when to seek professional help.")
-                        break
+            if not self.gemini_available:
+                return None
                 
-                # Check for symptoms
+            logger.info(f"Calling Gemini API with prompt: {prompt[:50]}...")
+            
+            # Add system prompt to guide the model's behavior
+            system_prompt = "You are a supportive mental health chatbot. Respond directly with helpful and brief answers. Be empathetic and compassionate without unnecessary preambles."
+            full_prompt = f"{system_prompt}\n\nUser: {prompt}"
+            
+            # Generate response with Gemini
+            response = self.model.generate_content(full_prompt)
+            
+            content = response.text.strip()
+            logger.info(f"Gemini response received ({len(content)} chars)")
+            return content
+        except Exception as e:
+            logger.error(f"Gemini API error: {str(e)}")
+            return None
+
+    def _generate_fallback_response(self, message):
+        """Generate a fallback response when API is unavailable"""
+        msg_lower = message.lower().strip()
+        
+        # Basic greeting detection
+        if any(greeting in msg_lower for greeting in ["hey", "hi", "hello", "howdy", "greetings"]):
+            return "Hello! I'm here to support you. How are you feeling today?"
+        
+        # Handle depression
+        if "depress" in msg_lower:
+            return "Depression can be challenging to deal with. Regular exercise, maintaining a routine, and speaking with a professional can help. Would you like to share more about how you're feeling?"
+        
+        # Handle anxiety
+        if any(word in msg_lower for word in ["anxious", "anxiety", "worried", "stress", "panic"]):
+            return "Anxiety can feel overwhelming. Deep breathing exercises, mindfulness, and speaking with a professional can be helpful. Remember that you're not alone in this experience."
+        
+        # Handle sleep issues
+        if any(word in msg_lower for word in ["sleep", "insomnia", "tired", "exhausted", "fatigue"]):
+            return "Sleep issues can affect our mental health. Try maintaining a regular sleep schedule, avoiding screens before bed, and creating a relaxing bedtime routine. If problems persist, consider speaking with a healthcare provider."
+        
+        # Handle crisis situations - prioritize these
+        if any(word in msg_lower for word in ["help", "suicide", "kill myself", "die", "end it"]):
+            return "I'm concerned about what you're sharing. Please reach out to a crisis support line immediately: National Suicide Prevention Lifeline at 988 or 1-800-273-8255, or text HOME to 741741 to reach the Crisis Text Line. Your life matters."
+        
+        # Handle therapy questions
+        if any(word in msg_lower for word in ["therapy", "therapist", "counseling", "psychologist", "psychiatrist"]):
+            return "Seeking therapy can be a positive step toward better mental health. Types include cognitive-behavioral therapy, psychodynamic therapy, and others. Would you like more information about finding a therapist?"
+        
+        # Default response
+        return "I'm here to listen and support you. Would you like to tell me more about what you're experiencing?"
+
+    def chat(self, message: str) -> str:
+        """Process a user message and generate a response"""
+        logger.info(f"Processing message: {message[:50]}...")
+        
+        # Record message in session history
+        self.session_context["session_history"].append({
+            "user": message, 
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        # Initialize response
+        response = None
+        
+        # Process with Neo4j knowledge if available
+        if self.neo4j_available:
+            try:
+                # Check for mentioned disorders
+                mentioned_disorders = self.find_disorders(message)
+                if mentioned_disorders:
+                    disorder = mentioned_disorders[0]  # Focus on the first mentioned disorder
+                    prompt = f"A user mentioned {disorder}. Provide supportive information and brief tips for managing this condition. Be empathetic and direct."
+                    response = self._generate_response_gemini(prompt)
+                    
+                    # Fallback for disorders if API fails
+                    if not response:
+                        response = f"It sounds like you're mentioning {disorder}. This can be challenging to deal with. Would you like to share more about your experience with {disorder}? Remember that professional help is often important for managing this condition effectively."
+                
+                # If no disorders found, check for symptoms
                 if not response:
-                    found_symptoms = self.extract_symptoms(user_input)
-                    if found_symptoms:
-                        symptom_string = ", ".join(found_symptoms)
-                        response = ask_groq(f"Address these specific symptoms: {symptom_string}. Provide practical coping strategies and explain when professional help might be needed.")
+                    symptoms = self.extract_symptoms(message)
+                    if symptoms:
+                        prompt = f"A user mentioned these symptoms: {', '.join(symptoms)}. Provide supportive information and suggestions, while encouraging professional help if needed. Be empathetic and direct."
+                        response = self._generate_response_gemini(prompt)
+                        
+                        # Fallback for symptoms if API fails
+                        if not response:
+                            response = f"I notice you mentioned symptoms like {', '.join(symptoms)}. These symptoms can be associated with various conditions. It's important to discuss these with a healthcare provider for proper evaluation. Would you like to share more about when these symptoms occur?"
                         
                         # Track reported symptoms
-                        self.session_context["reported_symptoms"].extend(found_symptoms)
-            
-            # If no specific response generated, use default handling
-            if not response:
-                response = ask_groq(user_input)
-            
-            # Add response to history
-            self.session_context["session_history"].append({
-                "assistant": response,
-                "timestamp": datetime.now().isoformat()
-            })
-            
-            # Save session after each interaction
-            self.save_session()
-            
-            return response
-
-        except Exception as e:
-            logger.error(f"Error in chat method: {str(e)}")
-            return "I'm having trouble processing that. Could you rephrase?"
-
-# Optional CLI
-if __name__ == "__main__":
-    # Ensure you have a .env file with your GROQ_API_KEY
-    load_dotenv()
-    if not os.getenv("GROQ_API_KEY"):
-        print("Error: GROQ_API_KEY not found in .env file.")
-    else:
-        bot = MentalHealthChatbot(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
-        print("🤖 Hello! I'm here to support you. Type 'exit' to quit.\n")
-        while True:
-            user_input = input("You: ").strip()
-            if user_input.lower() in ["exit", "quit"]:
-                print("Chatbot: Take care! 💙")
-                break
-            response = bot.chat(user_input)
-            if response:
-                print("Chatbot:", response)
-            else:
-                print("Chatbot: I'm having trouble connecting right now. Please try again later.")
-        bot.close()
+                        self.session_context["reported_symptoms"].extend(symptoms)
+            except Exception as e:
+                logger.error(f"Error in Neo4j knowledge processing: {e}")
+        
+        # If no response generated yet, use general API response
+        if not response:
+            response = self._generate_response_gemini(message)
+        
+        # If API call failed, use fallback
+        if not response:
+            response = self._generate_fallback_response(message)
+        
+        # Save response in session history
+        self.session_context["session_history"].append({
+            "assistant": response, 
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        # Persist session
+        self.save_session()
+        
+        return response
 
 
+# Create chatbot instance
+chatbot_instance = MentalHealthChatbot(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
 
+
+@router.post("/chat")
+async def send_message(
+    message_data: ChatMessage,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Process a message from the user and return a chatbot response"""
+    try:
+        # Record user message in database
+        user_message = ChatMessageModel(
+            user_id=current_user.id, 
+            role="user", 
+            content=message_data.message, 
+            timestamp=datetime.utcnow()
+        )
+        db.add(user_message)
+
+        # Get response from chatbot
+        bot_reply = chatbot_instance.chat(message_data.message)
+
+        # Record bot response in database
+        bot_message = ChatMessageModel(
+            user_id=current_user.id, 
+            role="assistant", 
+            content=bot_reply, 
+            timestamp=datetime.utcnow()
+        )
+        db.add(bot_message)
+        db.commit()
+
+        return {"message": bot_reply}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Chat processing error: {e}")
+        raise HTTPException(status_code=500, detail="Internal error")
+
+
+@router.get("/chat/history")
+async def get_my_history(
+    current_user: User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    """Get the chat history for the current user"""
+    try:
+        messages = db.query(ChatMessageModel).filter(
+            ChatMessageModel.user_id == current_user.id
+        ).order_by(ChatMessageModel.timestamp).all()
+        
+        return [
+            {
+                "role": m.role, 
+                "content": m.content, 
+                "timestamp": m.timestamp.isoformat()
+            }
+            for m in messages
+        ]
+    except Exception as e:
+        logger.error(f"History fetch error: {e}")
+        raise HTTPException(status_code=500, detail="Could not retrieve chat history")
+
+
+@router.get("/chat/history/{user_id}")
+async def get_user_history(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get the chat history for a specific user (for therapists only)"""
+    # Check therapist access
+    if current_user.role != "therapist":
+        raise HTTPException(
+            status_code=403, 
+            detail="Only therapists can access other users' chat history"
+        )
+    
+    # Verify user exists
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        messages = db.query(ChatMessageModel).filter(
+            ChatMessageModel.user_id == user_id
+        ).order_by(ChatMessageModel.timestamp).all()
+        
+        return [
+            {
+                "role": m.role, 
+                "content": m.content, 
+                "timestamp": m.timestamp.isoformat()
+            }
+            for m in messages
+        ]
+    except Exception as e:
+        logger.error(f"User history fetch error: {e}")
+        raise HTTPException(status_code=500, detail="Could not retrieve user chat history")

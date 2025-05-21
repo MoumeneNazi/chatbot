@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from database import get_db
 from dependencies import get_current_user
-from models import User, ChatMessage, UserModel
+from models import User, ChatMessage, UserModel, TherapistApplicationModel, TherapistApplicationCreate, TherapistApplication
 from journal_models import JournalEntry, DisorderTreatmentModel, DisorderTreatmentCreate
 from journal_database import get_journal_db
 from neo4j import GraphDatabase
@@ -10,6 +10,9 @@ import os
 from dotenv import load_dotenv
 import logging
 from datetime import datetime
+import shutil
+from typing import Optional
+import uuid
 
 # Load environment variables
 env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -32,12 +35,175 @@ router = APIRouter(
     tags=["therapist"]
 )
 
+# Create uploads directory if it doesn't exist
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 async def get_current_therapist(current_user: User = Depends(get_current_user)) -> User:
     """Ensure the current user is a therapist."""
     if current_user.role != "therapist":
         logging.debug(f"Access denied for user: {current_user.username}, Role: {current_user.role}")
         raise HTTPException(status_code=403, detail="Access forbidden: Therapists only.")
     return current_user
+
+@router.post("/apply", response_model=TherapistApplication)
+async def apply_for_therapist(
+    full_name: str = Form(...),
+    email: str = Form(...),
+    specialty: str = Form(...),
+    license_number: str = Form(...),
+    certification: str = Form(...),
+    experience_years: int = Form(...),
+    document: Optional[UploadFile] = File(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Submit an application to become a therapist."""
+    try:
+        # Check if user already has a pending application
+        existing_application = db.query(TherapistApplicationModel).filter(
+            TherapistApplicationModel.user_id == current_user.id,
+            TherapistApplicationModel.status == "pending"
+        ).first()
+        
+        if existing_application:
+            raise HTTPException(
+                status_code=400,
+                detail="You already have a pending application"
+            )
+        
+        # Handle document upload if provided
+        document_path = None
+        if document:
+            # Create a unique filename
+            file_extension = os.path.splitext(document.filename)[1]
+            unique_filename = f"{uuid.uuid4()}{file_extension}"
+            document_path = os.path.join("uploads", unique_filename)
+            
+            # Save the file
+            file_location = os.path.join(UPLOAD_DIR, unique_filename)
+            with open(file_location, "wb") as file_object:
+                shutil.copyfileobj(document.file, file_object)
+        
+        # Create application
+        application = TherapistApplicationModel(
+            user_id=current_user.id,
+            full_name=full_name,
+            email=email,
+            specialty=specialty,
+            license_number=license_number,
+            certification=certification,
+            experience_years=experience_years,
+            document_path=document_path,
+            status="pending"
+        )
+        
+        db.add(application)
+        db.commit()
+        db.refresh(application)
+        
+        return application
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error creating therapist application: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to submit application: {str(e)}"
+        )
+
+@router.get("/application/status")
+async def get_application_status(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get the status of the current user's therapist application."""
+    try:
+        application = db.query(TherapistApplicationModel).filter(
+            TherapistApplicationModel.user_id == current_user.id
+        ).order_by(TherapistApplicationModel.created_at.desc()).first()
+        
+        if not application:
+            return {"status": "not_applied"}
+        
+        return {
+            "status": application.status,
+            "applied_at": application.created_at.isoformat(),
+            "updated_at": application.updated_at.isoformat()
+        }
+    except Exception as e:
+        logging.error(f"Error fetching application status: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch application status: {str(e)}"
+        )
+
+@router.get("/applications", response_model=list[TherapistApplication])
+async def list_applications(
+    status: Optional[str] = None,
+    current_user: User = Depends(get_current_therapist),
+    db: Session = Depends(get_db)
+):
+    """List all therapist applications (therapist only)."""
+    try:
+        query = db.query(TherapistApplicationModel)
+        
+        if status:
+            query = query.filter(TherapistApplicationModel.status == status)
+            
+        applications = query.order_by(TherapistApplicationModel.created_at.desc()).all()
+        return applications
+    except Exception as e:
+        logging.error(f"Error listing applications: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list applications: {str(e)}"
+        )
+
+@router.put("/applications/{application_id}/status")
+async def update_application_status(
+    application_id: int,
+    status: str = Body(..., embed=True),
+    current_user: User = Depends(get_current_therapist),
+    db: Session = Depends(get_db)
+):
+    """Update the status of a therapist application (therapist only)."""
+    try:
+        if status not in ["pending", "approved", "rejected"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid status. Must be 'pending', 'approved', or 'rejected'"
+            )
+            
+        application = db.query(TherapistApplicationModel).filter(
+            TherapistApplicationModel.id == application_id
+        ).first()
+        
+        if not application:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        application.status = status
+        application.updated_at = datetime.utcnow()
+        
+        # If approved, update user role
+        if status == "approved":
+            user = db.query(UserModel).filter(UserModel.id == application.user_id).first()
+            if user:
+                user.role = "therapist"
+        
+        db.commit()
+        
+        return {"message": f"Application status updated to {status}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error updating application status: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update application status: {str(e)}"
+        )
 
 @router.get("/chat/{username}")
 async def get_user_chat(

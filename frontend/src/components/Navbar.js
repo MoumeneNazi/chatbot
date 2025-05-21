@@ -32,6 +32,7 @@ function Navbar() {
                 <Link to="/journal">Journal</Link>
                 <Link to="/progress">Progress</Link>
                 <Link to="/review">Reviews</Link>
+                <Link to="/apply-therapist" className="apply-therapist-btn">Become a Therapist</Link>
               </>
             )}
             {role === 'therapist' && (

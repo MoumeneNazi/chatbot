@@ -21,6 +21,8 @@ function TherapistDashboard() {
   const [showDisorderDropdown, setShowDisorderDropdown] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [applications, setApplications] = useState([]);
+  const [showApplications, setShowApplications] = useState(false);
   const { token, role } = useAuth();
   const navigate = useNavigate();
 
@@ -49,6 +51,12 @@ function TherapistDashboard() {
         const disordersResponse = await api.get('/api/therapist/disorders');
         if (disordersResponse.data) {
           setDisorders(disordersResponse.data);
+        }
+        
+        // Fetch therapist applications
+        const applicationsResponse = await api.get('/api/therapist/applications');
+        if (applicationsResponse.data) {
+          setApplications(applicationsResponse.data);
         }
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -250,166 +258,238 @@ function TherapistDashboard() {
     }
   };
 
-  return (
-    <div className="page-container">
-      <div className="admin-dashboard">
-        <div className="dashboard-header">
-          <h2>Therapist Dashboard</h2>
-          <div className="dashboard-actions">
-            <button 
-              className="primary-button"
-              onClick={() => navigate('/reviews/add')}
-            >
-              Create New Review
-            </button>
-          </div>
-        </div>
+  const handleApplicationStatus = async (applicationId, status) => {
+    try {
+      await api.put(`/api/therapist/applications/${applicationId}/status`, { status });
+      // Update applications list
+      setApplications(prev => 
+        prev.map(app => 
+          app.id === applicationId ? { ...app, status } : app
+        )
+      );
+      alert(`Application status updated to ${status}`);
+    } catch (err) {
+      console.error('Error updating application status:', err);
+      alert(err.response?.data?.detail || 'Failed to update application status');
+    }
+  };
 
-        {loading ? (
-          <div className="loading">Loading...</div>
-        ) : (
-          <div className="dashboard-content">
-            {error && <p className="error">{error}</p>}
-            
-            <div className="dashboard-grid">
-              <div className="patients-list">
-                <h3>Patients</h3>
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString();
+  };
+
+  return (
+    <div className="admin-container">
+      <div className="admin-sidebar">
+        <h2>Therapist Dashboard</h2>
+        <div className="admin-menu">
+          <button 
+            className={!showApplications ? "active" : ""} 
+            onClick={() => setShowApplications(false)}
+          >
+            Patient Management
+          </button>
+          <button 
+            className={showApplications ? "active" : ""} 
+            onClick={() => setShowApplications(true)}
+          >
+            Therapist Applications
+            {applications.filter(app => app.status === 'pending').length > 0 && (
+              <span className="badge">{applications.filter(app => app.status === 'pending').length}</span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="admin-content">
+        {error && <div className="error-message">{error}</div>}
+        
+        {!showApplications ? (
+          // Patient Management Section
+          <div className="admin-section">
+            <h3>Patient Management</h3>
+            <div className="admin-grid">
+              <div className="users-list">
+                <h4>Patients</h4>
                 {users.length > 0 ? (
-                  <div className="user-list">
-                    {users.map((u, i) => (
-                      <div 
-                        key={i} 
-                        className={`user-card ${selectedUser?.username === u.username ? 'selected' : ''}`}
-                        onClick={() => selectUser(u)}
+                  <ul>
+                    {users.map(user => (
+                      <li 
+                        key={user.id} 
+                        className={selectedUser?.id === user.id ? 'selected' : ''}
+                        onClick={() => selectUser(user)}
                       >
-                        <h4>{u.username}</h4>
+                        {user.username}
                         <div className="user-actions">
-                          <button onClick={(e) => { e.stopPropagation(); viewJournal(u.username); }}>Journal</button>
-                          <button onClick={(e) => { e.stopPropagation(); viewChat(u.username); }}>Chat</button>
+                          <button onClick={() => viewChat(user.username)}>Chat</button>
+                          <button onClick={() => viewJournal(user.username)}>Journal</button>
                         </div>
-                      </div>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 ) : (
                   <p>No patients found</p>
                 )}
               </div>
-              
-              {selectedUser && (
-                <div className="treatment-section">
-                  <div className="treatment-header">
-                    <h3>Treatment Plans for {selectedUser.username}</h3>
-                    <button 
-                      className="add-treatment-btn"
-                      onClick={() => setShowTreatmentForm(!showTreatmentForm)}
-                    >
-                      {showTreatmentForm ? 'Cancel' : 'Add Treatment Plan'}
-                    </button>
-                  </div>
-                  
-                  {showTreatmentForm && (
-                    <form className="treatment-form" onSubmit={createTreatment}>
-                      <div className="form-group" ref={searchRef}>
-                        <label>Disorder:</label>
-                        <input
-                          type="text"
-                          name="disorder"
-                          value={disorderSearch}
-                          onChange={handleDisorderSearch}
-                          onFocus={() => setShowDisorderDropdown(true)}
-                          placeholder="Type to search for a disorder..."
-                          required
-                        />
-                        {showDisorderDropdown && (
-                          <div className="disorder-dropdown">
-                            {filteredDisorders.length > 0 ? (
-                              filteredDisorders.map((disorder, idx) => (
-                                <div
-                                  key={idx}
-                                  className="disorder-option"
-                                  onClick={() => selectDisorder(disorder)}
-                                >
-                                  {disorder}
-                                </div>
-                              ))
-                            ) : (
-                              <div className="disorder-option no-results">
-                                {disorderSearch.trim() ? "No matching disorders found" : "Type to search disorders"}
+
+              <div className="user-details">
+                {selectedUser ? (
+                  <div>
+                    <h4>Patient: {selectedUser.username}</h4>
+                    
+                    <div className="treatment-section">
+                      <h5>Treatment Plans</h5>
+                      {treatments.length > 0 ? (
+                        <ul className="treatments-list">
+                          {treatments.map(treatment => (
+                            <li key={treatment.id} className={`treatment-item ${getStatusClass(treatment.status)}`}>
+                              <div className="treatment-header">
+                                <h6>{treatment.disorder}</h6>
+                                <span className={`status ${treatment.status.toLowerCase()}`}>
+                                  {treatment.status}
+                                </span>
                               </div>
+                              <p className="treatment-plan">{treatment.treatment_plan}</p>
+                              <div className="treatment-meta">
+                                <span>Duration: {treatment.duration_weeks} weeks</span>
+                                <span>Created: {new Date(treatment.created_at).toLocaleDateString()}</span>
+                              </div>
+                              <div className="treatment-actions">
+                                <button 
+                                  onClick={() => updateTreatmentStatus(treatment.id, 'Active')}
+                                  disabled={treatment.status === 'Active'}
+                                >
+                                  Set Active
+                                </button>
+                                <button 
+                                  onClick={() => updateTreatmentStatus(treatment.id, 'Completed')}
+                                  disabled={treatment.status === 'Completed'}
+                                >
+                                  Mark Complete
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p>No treatment plans found</p>
+                      )}
+                      
+                      <button 
+                        className="add-treatment-btn"
+                        onClick={() => setShowTreatmentForm(!showTreatmentForm)}
+                      >
+                        {showTreatmentForm ? 'Cancel' : 'Add Treatment Plan'}
+                      </button>
+                      
+                      {showTreatmentForm && (
+                        <form onSubmit={createTreatment} className="treatment-form">
+                          <div className="form-group" ref={searchRef}>
+                            <label>Disorder</label>
+                            <input
+                              type="text"
+                              name="disorder"
+                              value={disorderSearch}
+                              onChange={handleDisorderSearch}
+                              placeholder="Search disorders..."
+                              required
+                            />
+                            {showDisorderDropdown && filteredDisorders.length > 0 && (
+                              <ul className="disorder-dropdown">
+                                {filteredDisorders.map((disorder, index) => (
+                                  <li key={index} onClick={() => selectDisorder(disorder)}>
+                                    {disorder}
+                                  </li>
+                                ))}
+                              </ul>
                             )}
                           </div>
-                        )}
-                      </div>
-                      
-                      <div className="form-group">
-                        <label>Treatment Plan:</label>
-                        <textarea
-                          name="treatment_plan"
-                          value={treatmentData.treatment_plan}
-                          onChange={handleInputChange}
-                          rows="4"
-                          required
-                          placeholder="Describe the treatment plan..."
-                        />
-                      </div>
-                      
-                      <div className="form-group">
-                        <label>Duration (weeks):</label>
-                        <input
-                          type="number"
-                          name="duration_weeks"
-                          value={treatmentData.duration_weeks}
-                          onChange={handleInputChange}
-                          min="1"
-                          max="52"
-                          required
-                        />
-                      </div>
-                      
-                      <button type="submit" className="submit-btn">Create Treatment Plan</button>
-                    </form>
-                  )}
-                  
-                  <div className="treatments-list">
-                    {treatments.length > 0 ? (
-                      treatments.map((treatment, idx) => (
-                        <div key={idx} className="treatment-card">
-                          <div className="treatment-header">
-                            <h4>{treatment.disorder}</h4>
-                            <span className={`treatment-status ${getStatusClass(treatment.status)}`}>
-                              {treatment.status}
-                            </span>
+                          <div className="form-group">
+                            <label>Treatment Plan</label>
+                            <textarea
+                              name="treatment_plan"
+                              value={treatmentData.treatment_plan}
+                              onChange={handleInputChange}
+                              placeholder="Describe the treatment plan..."
+                              required
+                              rows={4}
+                            ></textarea>
                           </div>
-                          <p className="treatment-plan">{treatment.treatment_plan}</p>
-                          <div className="treatment-details">
-                            <span>Duration: {treatment.duration_weeks} weeks</span>
-                            <span>Started: {new Date(treatment.created_at).toLocaleDateString()}</span>
+                          <div className="form-group">
+                            <label>Duration (weeks)</label>
+                            <input
+                              type="number"
+                              name="duration_weeks"
+                              value={treatmentData.duration_weeks}
+                              onChange={handleInputChange}
+                              min={1}
+                              max={52}
+                              required
+                            />
                           </div>
-                          {treatment.status === 'Active' && (
-                            <div className="treatment-actions">
-                              <button 
-                                className="complete-btn"
-                                onClick={() => updateTreatmentStatus(treatment.id, 'Completed')}
-                              >
-                                Mark Completed
-                              </button>
-                              <button 
-                                className="cancel-btn"
-                                onClick={() => updateTreatmentStatus(treatment.id, 'Canceled')}
-                              >
-                                Cancel Treatment
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <p>No treatments found for this patient</p>
+                          <button type="submit" className="submit-btn">Create Treatment Plan</button>
+                        </form>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p>Select a patient to view details</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          // Therapist Applications Section
+          <div className="admin-section">
+            <h3>Therapist Applications</h3>
+            {applications.length > 0 ? (
+              <div className="applications-list">
+                {applications.map(app => (
+                  <div key={app.id} className={`application-card ${app.status.toLowerCase()}`}>
+                    <div className="application-header">
+                      <h4>{app.full_name}</h4>
+                      <span className={`status-badge ${app.status}`}>
+                        {app.status.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="application-details">
+                      <p><strong>Email:</strong> {app.email}</p>
+                      <p><strong>Specialty:</strong> {app.specialty}</p>
+                      <p><strong>License #:</strong> {app.license_number}</p>
+                      <p><strong>Certification:</strong> {app.certification}</p>
+                      <p><strong>Experience:</strong> {app.experience_years} years</p>
+                      <p><strong>Applied:</strong> {formatDate(app.created_at)}</p>
+                      {app.document_path && (
+                        <p>
+                          <strong>Document:</strong> 
+                          <a href={`/Backend/${app.document_path}`} target="_blank" rel="noopener noreferrer">
+                            View Document
+                          </a>
+                        </p>
+                      )}
+                    </div>
+                    {app.status === 'pending' && (
+                      <div className="application-actions">
+                        <button 
+                          className="approve-btn"
+                          onClick={() => handleApplicationStatus(app.id, 'approved')}
+                        >
+                          Approve
+                        </button>
+                        <button 
+                          className="reject-btn"
+                          onClick={() => handleApplicationStatus(app.id, 'rejected')}
+                        >
+                          Reject
+                        </button>
+                      </div>
                     )}
                   </div>
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p>No therapist applications found</p>
+            )}
           </div>
         )}
       </div>

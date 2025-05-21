@@ -4,7 +4,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from auth import router as auth_router
 from chatbot import router as chatbot_router
-from chat import router as chat_router
 from journal import router as journal_router
 from review import router as review_router
 from users import router as users_router
@@ -57,7 +56,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 # Include routers
 app.include_router(auth_router)
-app.include_router(chat_router)
 app.include_router(chatbot_router)
 app.include_router(journal_router)
 app.include_router(review_router)

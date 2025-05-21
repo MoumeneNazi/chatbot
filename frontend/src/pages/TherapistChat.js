@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
 import '../styles/pages.css';
@@ -7,6 +7,7 @@ import '../styles/chat.css';
 
 const TherapistChat = () => {
   const navigate = useNavigate();
+  const { username } = useParams();
   const { token, role } = useAuth();
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -15,6 +16,7 @@ const TherapistChat = () => {
   const [error, setError] = useState(null);
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [filteredUsers, setFilteredUsers] = useState([]);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (role !== 'therapist') {
@@ -23,6 +25,16 @@ const TherapistChat = () => {
     }
     fetchUsers();
   }, [role, navigate]);
+
+  useEffect(() => {
+    // If username is provided in URL, find and select that user
+    if (username && users.length > 0) {
+      const user = users.find(u => u.username === username);
+      if (user) {
+        setSelectedUser(user);
+      }
+    }
+  }, [username, users]);
 
   useEffect(() => {
     if (selectedUser) {
@@ -75,6 +87,20 @@ const TherapistChat = () => {
     setFilteredUsers([]);
   };
 
+  const exportChat = async () => {
+    if (!selectedUser) return;
+    
+    try {
+      setExporting(true);
+      // Open the export URL in a new tab
+      window.open(`/api/chat/export/${selectedUser.id}`, '_blank');
+    } catch (error) {
+      console.error('Error exporting chat:', error);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="page-container">
       <div className="chat-container">
@@ -87,12 +113,27 @@ const TherapistChat = () => {
           {selectedUser ? (
             <div className="selected-user-info">
               <h3>Chat History for: {selectedUser.username}</h3>
-              <button
-                onClick={() => setSelectedUser(null)}
-                className="change-user-btn"
-              >
-                Change User
-              </button>
+              <div className="user-actions">
+                <button
+                  onClick={() => setSelectedUser(null)}
+                  className="change-user-btn"
+                >
+                  Change User
+                </button>
+                <button
+                  onClick={exportChat}
+                  disabled={exporting || chatHistory.length === 0}
+                  className="export-button"
+                  title="Export chat as HTML"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  {exporting ? 'Exporting...' : 'Share'}
+                </button>
+              </div>
             </div>
           ) : (
             <div className="user-search">

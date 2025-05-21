@@ -14,6 +14,7 @@ import AddReview from "./pages/AddReview";
 import Therapist from "./pages/Therapist";
 import TherapistChat from "./pages/TherapistChat";
 import TherapistJournal from "./pages/TherapistJournal";
+import TherapistApplication from "./pages/TherapistApplication";
 
 const ProtectedRoute = ({ children, roles }) => {
   const { token, hasPermission } = useAuth();
@@ -76,6 +77,14 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute roles={["therapist"]}>
           <AddReview />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/apply-therapist"
+      element={
+        <ProtectedRoute roles={["user"]}>
+          <TherapistApplication />
         </ProtectedRoute>
       }
     />
